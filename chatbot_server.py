@@ -242,6 +242,7 @@ async def websocket_chat(ws: WebSocket):
             ]
         result = await Runner.run(agent, input=chat_hist)
         reply = result.final_output
+        reply_ts = int(time.time() * 1000)
         with Session(engine) as session:
             rec = session.get(Usage, user)
             rec.total_bot_words += len(reply.split())
@@ -251,7 +252,7 @@ async def websocket_chat(ws: WebSocket):
                     username=user,
                     role="assistant",
                     content=reply,
-                    timestamp=ts,
+                    timestamp=reply_ts,
                 )
             )
             session.commit()
@@ -306,6 +307,7 @@ async def chat_http(
         ]
     result = await Runner.run(agent, input=chat_hist)
     reply = result.final_output
+    reply_ts = int(time.time() * 1000)
     with Session(engine) as session:
         rec = session.get(Usage, user)
         rec.total_bot_words += len(reply.split())
@@ -315,7 +317,7 @@ async def chat_http(
                 username=user,
                 role="assistant",
                 content=reply,
-                timestamp=ts,
+                timestamp=reply_ts,
             )
         )
         session.commit()
