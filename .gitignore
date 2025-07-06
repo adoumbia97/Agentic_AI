@@ -126,4 +126,8 @@ cython_debug/
 # macOS
 .DS_Store
 
+# Ignore generated chat databases
+chat.db
+*.db
+
 # End of file
