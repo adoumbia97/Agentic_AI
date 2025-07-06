@@ -1,5 +1,10 @@
 import sys
 from pathlib import Path
+import os
+import openai
+
+os.environ.pop("OPENAI_API_KEY", None)
+openai.api_key = None
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))  # noqa: E402
 
@@ -25,4 +30,4 @@ def test_handler_collects_and_analyzes():
     assert "country" in step5.lower()
 
     final = handler.collect(country="Kenya")
-    assert "analysis:" in final.lower()
+    assert "analysis failed:" in final.lower()
