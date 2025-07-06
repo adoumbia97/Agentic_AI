@@ -345,7 +345,7 @@
       }
       const path = role==='user'
                  ? `/usage?access_token=${token}`
-                 : `/admin/usage?access_token=${token}`;
+                 : `/admin/users?access_token=${token}`;
       try {
         const resp = await fetch(path);
         if (!resp.ok) throw 0;
