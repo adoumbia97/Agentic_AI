@@ -213,7 +213,7 @@ class Runner:
             if not client:
                 raise RuntimeError("OpenAI client not configured")
             response = await client.chat.completions.create(
-                model="gpt-3.5-turbo-0613",
+                model="gpt-3.5-turbo",
                 messages=messages,
                 tools=(
                     [_tool_spec(t) for t in agent.tools] if requested_tool else None
@@ -258,7 +258,7 @@ class Runner:
                 if not client:
                     raise RuntimeError("OpenAI client not configured")
                 follow = await client.chat.completions.create(
-                    model="gpt-3.5-turbo-0613",
+                    model="gpt-3.5-turbo",
                     messages=[{"role": "system", "content": agent.instructions}] + agent.history,
                 )
                 await client.aclose()
