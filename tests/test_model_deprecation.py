@@ -17,7 +17,7 @@ async def test_runner_uses_updated_model():
     mock_client.chat.completions.create = AsyncMock(
         return_value=Mock(choices=[Mock(message={"content": "hi"})])
     )
-    mock_client.aclose = AsyncMock()
+    mock_client.close = AsyncMock()
     with patch.object(openai, "api_key", "test"):
         with patch("simple_agents.get_async_client", return_value=mock_client):
             agent = Agent(name="T", instructions="test", tools=[])

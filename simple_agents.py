@@ -226,7 +226,7 @@ class Runner:
                     "function": {"name": requested_tool.__name__},
                 }
             response = await client.chat.completions.create(**payload)
-            await client.aclose()
+            await client.close()
             print("OpenAI response:", response)
             msg = response.choices[0].message
             if msg.get("function_call"):
@@ -263,7 +263,7 @@ class Runner:
                     model="gpt-3.5-turbo",
                     messages=[{"role": "system", "content": agent.instructions}] + agent.history,
                 )
-                await client.aclose()
+                await client.close()
                 final = follow.choices[0].message.content
             else:
                 final = msg.get("content", "")
