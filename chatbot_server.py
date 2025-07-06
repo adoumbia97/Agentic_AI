@@ -7,7 +7,7 @@ from fastapi import (
 from fastapi.responses import HTMLResponse
 from fastapi.security.api_key import APIKeyQuery, APIKeyHeader
 from pydantic import BaseModel
-from agents import Agent, Runner, function_tool
+from simple_agents import Agent, Runner, function_tool
 
 # ─── CONFIG ───────────────────────────────────────────────────
 USER_API_KEYS  = {"user1-token": "user1", "user2-token": "user2"}
