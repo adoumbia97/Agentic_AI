@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 
 from typing import Optional
 
@@ -96,7 +97,8 @@ app = FastAPI(lifespan=lifespan)
 # ─── SERVE FRONTEND ────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
-    return HTMLResponse(open("index.html", encoding="utf-8").read())
+    index_path = Path(__file__).parent / "index.html"
+    return HTMLResponse(index_path.read_text(encoding="utf-8"))
 
 # ─── USER HISTORY & USAGE ──────────────────────────────────────
 @app.get("/history")
