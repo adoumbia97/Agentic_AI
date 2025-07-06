@@ -186,6 +186,23 @@ async def upload_document(
     return {"filename": file.filename}
 
 
+@app.get("/admin/docs")
+async def list_documents(admin: str = Depends(get_admin)):
+    """Return a list of uploaded document names."""
+    files = [p.name for p in DOCS_DIR.glob("*") if p.is_file()]
+    return {"username": admin, "files": files}
+
+
+@app.delete("/admin/docs/{filename}")
+async def delete_document(filename: str, admin: str = Depends(get_admin)):
+    """Delete a previously uploaded document."""
+    dest = DOCS_DIR / filename
+    deleted = dest.is_file()
+    if deleted:
+        dest.unlink()
+    return {"filename": filename, "deleted": deleted}
+
+
 @app.get("/admin/history/{username}")
 async def admin_history(
     username: str,
@@ -201,6 +218,17 @@ async def admin_history(
         for m in msgs
     ]
     return {"username": username, "history": mapped}
+
+
+@app.delete("/admin/history/{username}")
+async def admin_clear_history(
+    username: str,
+    admin: str = Depends(get_admin),
+):
+    """Clear all stored messages for the given user."""
+    if username in conversations:
+        conversations[username].clear()
+    return {"username": username, "cleared": True}
 
 
 # ─── WEBSOCKET CHAT ───────────────────────────────────────────
