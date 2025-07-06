@@ -26,6 +26,7 @@ async def test_runner_uses_updated_model():
                 mock_client.chat.completions.create.call_args.kwargs["model"]
                 == "gpt-3.5-turbo"
             )
+            assert "tool_choice" not in mock_client.chat.completions.create.call_args.kwargs
 
 
 def test_food_security_analysis_uses_updated_model():

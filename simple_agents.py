@@ -212,18 +212,20 @@ class Runner:
             client = get_async_client()
             if not client:
                 raise RuntimeError("OpenAI client not configured")
-            response = await client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                tools=(
-                    [_tool_spec(t) for t in agent.tools] if requested_tool else None
-                ),
-                tool_choice=(
-                    {"type": "function", "function": {"name": requested_tool.__name__}}
-                    if requested_tool
-                    else "none"
-                ),
+            tools_param = (
+                [_tool_spec(t) for t in agent.tools] if requested_tool else None
             )
+            payload = {
+                "model": "gpt-3.5-turbo",
+                "messages": messages,
+            }
+            if tools_param:
+                payload["tools"] = tools_param
+                payload["tool_choice"] = {
+                    "type": "function",
+                    "function": {"name": requested_tool.__name__},
+                }
+            response = await client.chat.completions.create(**payload)
             await client.aclose()
             print("OpenAI response:", response)
             msg = response.choices[0].message
