@@ -110,12 +110,17 @@ agent = Agent(
     tools=[get_weather],
 )
 
-app = FastAPI()
+
+from contextlib import asynccontextmanager
 
 
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 # ─── SERVE FRONTEND ────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
