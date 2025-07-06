@@ -7,7 +7,7 @@ This repository contains a lightweight AI-powered chatbot application built with
 - **FastAPI** backend serving HTTP and WebSocket endpoints
 - **Real-time chat** with persistent conversation history in memory
 - **Token authentication** for users and admins
-- **Admin dashboard** to view usage metrics and activate/deactivate users
+- **Admin dashboard** to view usage metrics, manage users, and control uploaded documents
 - **Single-page UI** built with Bootstrap 5
 
 ## Project Layout
@@ -47,6 +47,13 @@ The server uses simple in-memory API keys for demonstration:
 - `admin-token` → admin `admin`
 
 Use these tokens in the UI when logging in as a user or admin.
+
+### Admin Features
+
+Admins can manage user conversations and uploaded documents via the API:
+
+- `DELETE /admin/history/{username}` clears a user's chat history.
+- `GET /admin/docs` lists uploaded files and `DELETE /admin/docs/{filename}` removes one.
 
 ## Sample Bot Behavior
 

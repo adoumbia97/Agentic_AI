@@ -48,10 +48,13 @@ Build a lightweight, production-grade AI chatbot with:
   - `GET /` → serves `index.html`  
   - `GET /history` → returns `{ username, history: [ { who, text, ts }, … ] }`  
   - `GET /usage` → returns per-user usage + username  
-  - `GET /admin/users` → returns `{ username: admin, users: { user1: {…}, user2: {…} } }`  
-  - `PATCH /admin/users/{username}` → toggles a user’s active flag  
-  - `WebSocket /ws/chat` → real-time chat stream (requires valid user token)  
-  - `POST /chat` → optional HTTP fallback for chat  
+  - `GET /admin/users` → returns `{ username: admin, users: { user1: {…}, user2: {…} } }`
+  - `PATCH /admin/users/{username}` → toggles a user’s active flag
+  - `DELETE /admin/history/{username}` → clears a user's stored chat history
+  - `GET /admin/docs` → lists uploaded documents
+  - `DELETE /admin/docs/{filename}` → removes a document
+  - `WebSocket /ws/chat` → real-time chat stream (requires valid user token)
+  - `POST /chat` → optional HTTP fallback for chat
 
 - **Chat Logic**  
   1. On each user message:  
