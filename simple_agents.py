@@ -97,15 +97,17 @@ class Runner:
                     "content": m.get("content", ""),
                 }
                 for m in input
+                if m.get("role") != "system"
             ]
             if incoming:
                 message = incoming[-1]["content"]
-                agent.history.extend(incoming)
+                agent.history = incoming[-history_size:]
+            else:
+                message = ""
         else:
             message = str(input)
             agent.history.append({"role": "user", "content": message})
-
-        agent.history = agent.history[-history_size:]
+            agent.history = agent.history[-history_size:]
 
         if not openai or not getattr(openai, "api_key", None):
             reply = _simple_reply(message, agent.history)
@@ -117,6 +119,8 @@ class Runner:
         messages = [
             {"role": "system", "content": agent.instructions}
         ] + agent.history
+
+        print("Sending messages to OpenAI:", messages)
 
         requested_tool = None
         for tool in agent.tools:
@@ -148,6 +152,7 @@ class Runner:
                 if requested_tool
                 else "none",
             )
+            print("OpenAI response:", response)
             msg = response.choices[0].message
             if msg.get("function_call"):
                 name = msg["function_call"]["name"]
@@ -184,12 +189,14 @@ class Runner:
                 final = follow.choices[0].message.content
             else:
                 final = msg.get("content", "")
+            if not final.strip():
+                final = "..."
             agent.history.append({"role": "assistant", "content": final})
             agent.history = agent.history[-history_size:]
             agent.logger.debug("[openai] user=%s reply=%s", message, final)
             return Result(final)
         except Exception as exc:
-            agent.logger.error("OpenAI request failed: %s", exc)
+            agent.logger.exception("OpenAI request failed: %s", exc)
             reply = _simple_reply(message, agent.history)
             agent.history.append({"role": "assistant", "content": reply})
             agent.history = agent.history[-history_size:]
