@@ -32,3 +32,10 @@ async def test_memory_absent():
 async def test_weather_intent_parsing():
     result = await Runner.run(agent, input="What's the weather in Paris?")
     assert result.final_output == "The weather in Paris is sunny."
+
+@pytest.mark.asyncio
+async def test_weather_variations():
+    res1 = await Runner.run(agent, input="Bamako weather?")
+    assert res1.final_output == "The weather in Bamako is sunny."
+    res2 = await Runner.run(agent, input="What is the weather of Bamako")
+    assert res2.final_output == "The weather in Bamako is sunny."
