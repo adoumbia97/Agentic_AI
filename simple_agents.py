@@ -141,36 +141,12 @@ class Runner:
                         )
                     return f"Error running tool {tool.__name__}: incorrect arguments"
 
-            weather_tool = next(
-                (t for t in agent.tools if t.__name__ == "get_weather"),
-                None,
-            )
-            if weather_tool:
-                match = re.search(
-                    r"(?:weather|forecast|temperature|umbrella|rain)"
-                    r".*(?:in|for|of) ([A-Za-z ]+)",
-                    lowered,
-                )
-                if not match:
-                    match = re.search(
-                        r"([A-Za-z ]+)\s+(?:weather|forecast)",
-                        lowered,
-                    )
-                if match:
-                    grp = match.lastindex or 1
-                    city = match.group(grp).strip().title()
-                    try:
-                        return str(weather_tool(city))
-                    except Exception as exc:
-                        return f"Error running tool get_weather: {exc}"
-
             if lowered in {"hi", "hello"}:
                 return "Hello! How can I assist you today?"
             if lowered == "help":
                 return (
-                    "Ask about the weather, fetch docs with 'fetch_doc',"
-                    " show the time with 'show_time', or clear history with "
-                    "'clear history'."
+                    "Start a food security analysis with 'analyze <commodity>' "
+                    "or clear history with 'clear history'."
                 )
 
             return "I'm not sure how to help with that."

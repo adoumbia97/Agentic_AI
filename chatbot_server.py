@@ -89,30 +89,10 @@ def ensure_history(user: str) -> None:
 
 
 # ─── AGENT SETUP ───────────────────────────────────────────────
-@function_tool
-def get_weather(city: str) -> str:
-    return f"The weather in {city} is sunny."
-
-
-@function_tool
-def show_time(_: str = "") -> str:
-    """Return the current server time."""
-    return time.strftime("%Y-%m-%d %H:%M:%S")
-
-
-@function_tool
-def fetch_doc(name: str) -> str:
-    """Return the contents of a document stored in docs/."""
-    path = DOCS_DIR / name
-    if not path.exists():
-        return "Document not found."
-    return path.read_text()
-
-
 agent = Agent(
     name="Utility Bot",
     instructions=SYSTEM_PROMPT,
-    tools=[get_weather, show_time, fetch_doc, food_security_analyst],
+    tools=[food_security_analyst],
 )
 
 app = FastAPI()

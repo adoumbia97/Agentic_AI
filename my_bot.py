@@ -1,15 +1,12 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from simple_agents import Agent, Runner, function_tool
-
-@function_tool
-def get_weather(city: str) -> str:
-    return f"The weather in {city} is sunny."
+from simple_agents import Agent, Runner
+from food_security import food_security_analyst
 
 agent = Agent(
     name="Hello world",
     instructions="You are a helpful agent.",
-    tools=[get_weather],
+    tools=[food_security_analyst],
 )
 
 app = FastAPI()
