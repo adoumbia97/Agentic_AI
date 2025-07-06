@@ -1,5 +1,5 @@
 import time
-from collections import defaultdict
+
 from typing import Optional
 
 from sqlmodel import Field, Session, SQLModel, create_engine, select
@@ -63,41 +63,12 @@ class Usage(SQLModel, table=True):
     total_bot_words: int = 0
 
 
-usage_cache = defaultdict(lambda: {
-    "conversations": 0,
-    "messages": 0,
-    "first_request": None,
-    "last_request": None,
-    "total_user_words": 0,
-    "total_bot_words": 0,
-})
-conversations_cache = defaultdict(list)
 
 engine = create_engine("sqlite:///chat.db")
 
 
 def init_db():
     SQLModel.metadata.create_all(engine)
-
-    # migrate in-memory data if present and db empty
-    with Session(engine) as session:
-        has_usage = session.exec(select(Usage)).first() is not None
-        if not has_usage and usage_cache:
-            for user, data in usage_cache.items():
-                session.add(Usage(username=user, **data))
-        has_msgs = session.exec(select(Message)).first() is not None
-        if not has_msgs and conversations_cache:
-            for user, msgs in conversations_cache.items():
-                for m in msgs:
-                    session.add(
-                        Message(
-                            username=user,
-                            role=m["role"],
-                            content=m["content"],
-                            timestamp=m["ts"],
-                        )
-                    )
-        session.commit()
 
 # ─── AGENT SETUP ───────────────────────────────────────────────
 @function_tool
