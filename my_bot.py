@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from agents import Agent, Runner, function_tool
+from simple_agents import Agent, Runner, function_tool
 
 @function_tool
 def get_weather(city: str) -> str:
