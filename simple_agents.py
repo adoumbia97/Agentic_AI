@@ -97,15 +97,17 @@ class Runner:
                     "content": m.get("content", ""),
                 }
                 for m in input
+                if m.get("role") != "system"
             ]
             if incoming:
                 message = incoming[-1]["content"]
-                agent.history.extend(incoming)
+                agent.history = incoming[-history_size:]
+            else:
+                message = ""
         else:
             message = str(input)
             agent.history.append({"role": "user", "content": message})
-
-        agent.history = agent.history[-history_size:]
+            agent.history = agent.history[-history_size:]
 
         if not openai or not getattr(openai, "api_key", None):
             reply = _simple_reply(message, agent.history)
