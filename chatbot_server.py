@@ -1,5 +1,8 @@
 import time
 from collections import defaultdict
+from typing import Optional
+
+from sqlmodel import Field, Session, SQLModel, create_engine, select
 from fastapi import (
     FastAPI, WebSocket, WebSocketDisconnect,
     Depends, HTTPException, status
@@ -42,15 +45,59 @@ def get_admin(
     return ADMIN_API_KEYS[token]
 
 # ─── METRICS & STORAGE ─────────────────────────────────────────
-usage = defaultdict(lambda: {
-    "conversations":     0,
-    "messages":          0,
-    "first_request":     None,
-    "last_request":      None,
-    "total_user_words":  0,
-    "total_bot_words":   0,
+class Message(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str
+    role: str
+    content: str
+    timestamp: int
+
+
+class Usage(SQLModel, table=True):
+    username: str = Field(primary_key=True)
+    conversations: int = 0
+    messages: int = 0
+    first_request: Optional[int] = None
+    last_request: Optional[int] = None
+    total_user_words: int = 0
+    total_bot_words: int = 0
+
+
+usage_cache = defaultdict(lambda: {
+    "conversations": 0,
+    "messages": 0,
+    "first_request": None,
+    "last_request": None,
+    "total_user_words": 0,
+    "total_bot_words": 0,
 })
-conversations = defaultdict(list)  # user → list of {role, content, ts}
+conversations_cache = defaultdict(list)
+
+engine = create_engine("sqlite:///chat.db")
+
+
+def init_db():
+    SQLModel.metadata.create_all(engine)
+
+    # migrate in-memory data if present and db empty
+    with Session(engine) as session:
+        has_usage = session.exec(select(Usage)).first() is not None
+        if not has_usage and usage_cache:
+            for user, data in usage_cache.items():
+                session.add(Usage(username=user, **data))
+        has_msgs = session.exec(select(Message)).first() is not None
+        if not has_msgs and conversations_cache:
+            for user, msgs in conversations_cache.items():
+                for m in msgs:
+                    session.add(
+                        Message(
+                            username=user,
+                            role=m["role"],
+                            content=m["content"],
+                            timestamp=m["ts"],
+                        )
+                    )
+        session.commit()
 
 # ─── AGENT SETUP ───────────────────────────────────────────────
 @function_tool
@@ -65,6 +112,11 @@ agent = Agent(
 
 app = FastAPI()
 
+
+@app.on_event("startup")
+def startup_event():
+    init_db()
+
 # ─── SERVE FRONTEND ────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
@@ -73,35 +125,40 @@ async def serve_index():
 # ─── USER HISTORY & USAGE ──────────────────────────────────────
 @app.get("/history")
 async def get_history(user: str = Depends(get_user)):
-    """
-    Return [{ who:'user'|'bot', text:str, ts:int }, ...]
-    """
-    mapped = []
-    for m in conversations[user]:
-        mapped.append({
-            "who": m["role"] == "assistant" and "bot" or "user",
-            "text": m["content"],
-            "ts": m["ts"],
-        })
+    """Return chat history for the user."""
+    with Session(engine) as session:
+        msgs = session.exec(
+            select(Message).where(Message.username == user).order_by(Message.timestamp)
+        ).all()
+        mapped = [
+            {
+                "who": m.role == "assistant" and "bot" or "user",
+                "text": m.content,
+                "ts": m.timestamp,
+            }
+            for m in msgs
+        ]
     return {"username": user, "history": mapped}
 
 @app.get("/usage")
 async def user_usage(user: str = Depends(get_user)):
-    """
-    Return { username, conversations, messages,
-             first_request, last_request,
-             total_user_words, total_bot_words }
-    """
-    u = usage[user]
-    return {
-        "username":            user,
-        "conversations":       u["conversations"],
-        "messages":            u["messages"],
-        "first_request":       u["first_request"],
-        "last_request":        u["last_request"],
-        "total_user_words":    u["total_user_words"],
-        "total_bot_words":     u["total_bot_words"],
-    }
+    """Return usage metrics for the user."""
+    with Session(engine) as session:
+        u = session.get(Usage, user)
+        if not u:
+            u = Usage(username=user)
+            session.add(u)
+            session.commit()
+            session.refresh(u)
+        return {
+            "username": user,
+            "conversations": u.conversations,
+            "messages": u.messages,
+            "first_request": u.first_request,
+            "last_request": u.last_request,
+            "total_user_words": u.total_user_words,
+            "total_bot_words": u.total_bot_words,
+        }
 
 # ─── ADMIN: LIST & TOGGLE USERS ───────────────────────────────
 @app.get("/admin/users")
@@ -109,16 +166,25 @@ async def admin_list_users(admin: str = Depends(get_admin)):
     """
     Return all users with usage + activation status.
     """
-    return {
-        "username": admin,
-        "users": {
-            u: {
-                **usage[u],
-                "active": user_status.get(u, False)
+    with Session(engine) as session:
+        users_data = {}
+        for u in USER_API_KEYS.values():
+            record = session.get(Usage, u)
+            if not record:
+                record = Usage(username=u)
+                session.add(record)
+                session.commit()
+                session.refresh(record)
+            users_data[u] = {
+                "conversations": record.conversations,
+                "messages": record.messages,
+                "first_request": record.first_request,
+                "last_request": record.last_request,
+                "total_user_words": record.total_user_words,
+                "total_bot_words": record.total_bot_words,
+                "active": user_status.get(u, False),
             }
-            for u in USER_API_KEYS.values()
-        }
-    }
+        return {"username": admin, "users": users_data}
 
 class UserStatusUpdate(BaseModel):
     active: bool
@@ -147,7 +213,16 @@ async def websocket_chat(ws: WebSocket):
         await ws.close(code=1008)
         return
 
-    usage[user]["conversations"] += 1
+    with Session(engine) as session:
+        record = session.get(Usage, user)
+        if not record:
+            record = Usage(username=user)
+            session.add(record)
+            session.commit()
+            session.refresh(record)
+        record.conversations += 1
+        session.add(record)
+        session.commit()
     await ws.accept()
 
     while True:
@@ -161,27 +236,49 @@ async def websocket_chat(ws: WebSocket):
             continue
 
         ts = int(time.time() * 1000)
-        u = usage[user]
-        # first request?
-        if u["first_request"] is None:
-            u["first_request"] = ts
-        u["messages"]      += 1
-        u["last_request"]  = ts
-        u["total_user_words"] += len(msg.split())
-
-        # store and call
-        conversations[user].append({"role": "user", "content": msg, "ts": ts})
-        # build OpenAI chat history
-        chat_hist = (
-            [{"role": "system", "content": agent.instructions}]
-            + [{"role": m["role"], "content": m["content"]}
-               for m in conversations[user]]
-        )
+        with Session(engine) as session:
+            rec = session.get(Usage, user)
+            if rec.first_request is None:
+                rec.first_request = ts
+            rec.messages += 1
+            rec.last_request = ts
+            rec.total_user_words += len(msg.split())
+            session.add(rec)
+            session.add(
+                Message(
+                    username=user,
+                    role="user",
+                    content=msg,
+                    timestamp=ts,
+                )
+            )
+            session.commit()
+            chat_msgs = session.exec(
+                select(Message)
+                .where(Message.username == user)
+                .order_by(Message.timestamp)
+            ).all()
+            chat_hist = [
+                {"role": "system", "content": agent.instructions}
+            ] + [
+                {"role": m.role, "content": m.content}
+                for m in chat_msgs
+            ]
         result = await Runner.run(agent, input=chat_hist)
         reply = result.final_output
-
-        u["total_bot_words"] += len(reply.split())
-        conversations[user].append({"role": "assistant", "content": reply, "ts": ts})
+        with Session(engine) as session:
+            rec = session.get(Usage, user)
+            rec.total_bot_words += len(reply.split())
+            session.add(rec)
+            session.add(
+                Message(
+                    username=user,
+                    role="assistant",
+                    content=reply,
+                    timestamp=ts,
+                )
+            )
+            session.commit()
 
         await ws.send_json({"reply": reply})
 
@@ -198,24 +295,54 @@ async def chat_http(
     user: str = Depends(get_user),
 ):
     ts = int(time.time() * 1000)
-    u = usage[user]
-    if u["first_request"] is None:
-        u["first_request"] = ts
-    u["messages"]      += 1
-    u["last_request"]   = ts
-    u["total_user_words"] += len(req.message.split())
-
-    conversations[user].append({"role": "user", "content": req.message, "ts": ts})
-    chat_hist = (
-        [{"role": "system", "content": agent.instructions}]
-        + [{"role": m["role"], "content": m["content"]}
-           for m in conversations[user]]
-    )
+    with Session(engine) as session:
+        rec = session.get(Usage, user)
+        if not rec:
+            rec = Usage(username=user)
+            session.add(rec)
+            session.commit()
+            session.refresh(rec)
+        if rec.first_request is None:
+            rec.first_request = ts
+        rec.messages += 1
+        rec.last_request = ts
+        rec.total_user_words += len(req.message.split())
+        session.add(rec)
+        session.add(
+            Message(
+                username=user,
+                role="user",
+                content=req.message,
+                timestamp=ts,
+            )
+        )
+        session.commit()
+        chat_msgs = session.exec(
+            select(Message)
+            .where(Message.username == user)
+            .order_by(Message.timestamp)
+        ).all()
+        chat_hist = [
+            {"role": "system", "content": agent.instructions}
+        ] + [
+            {"role": m.role, "content": m.content}
+            for m in chat_msgs
+        ]
     result = await Runner.run(agent, input=chat_hist)
     reply = result.final_output
-
-    u["total_bot_words"] += len(reply.split())
-    conversations[user].append({"role": "assistant", "content": reply, "ts": ts})
+    with Session(engine) as session:
+        rec = session.get(Usage, user)
+        rec.total_bot_words += len(reply.split())
+        session.add(rec)
+        session.add(
+            Message(
+                username=user,
+                role="assistant",
+                content=reply,
+                timestamp=ts,
+            )
+        )
+        session.commit()
 
     return ChatResponse(reply=reply)
 
