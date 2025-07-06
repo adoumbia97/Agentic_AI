@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import inspect
 import json
 import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Union
+
 
 try:
     import openai
@@ -23,6 +26,7 @@ class Agent:
     instructions: str
     tools: List[Callable]
     history: List[Dict[str, Any]] = field(default_factory=list)
+    state: Dict[str, Any] = field(default_factory=dict, repr=False)
     logger: logging.Logger = field(
         default_factory=lambda: logging.getLogger(__name__), repr=False
     )
@@ -31,6 +35,26 @@ class Agent:
 class Result:
     def __init__(self, final_output: str):
         self.final_output = final_output
+
+
+def _parse_food_security_reply(text: str, handler: FoodSecurityHandler) -> Dict[str, Any]:
+    """Extract the next required value from a user reply."""
+    pending = next((k for k in handler.order if k not in handler.data), None)
+    if not pending:
+        return {}
+    if pending in {"price_last_month", "price_two_months_ago"}:
+        match = re.search(r"[-+]?\d*\.?\d+", text)
+        if match:
+            return {pending: float(match.group())}
+    elif pending == "availability_level":
+        for lvl in ["high", "moderate", "low"]:
+            if lvl in text:
+                return {pending: lvl}
+    else:
+        words = text.split()
+        if words:
+            return {pending: words[0]}
+    return {}
 
 
 class Runner:
@@ -65,13 +89,38 @@ class Runner:
             ):
                 return prev_user
 
+            fs_key = "food_security_handler"
+            if fs_key in agent.state:
+                from food_security import FoodSecurityHandler
+
+                handler: FoodSecurityHandler = agent.state[fs_key]
+                prompt = handler.collect(**_parse_food_security_reply(lowered, handler))
+                if "analysis:" in prompt.lower():
+                    agent.state.pop(fs_key, None)
+                return prompt
+
             for tool in agent.tools:
                 if lowered.startswith(tool.__name__.lower()):
-                    arg = msg[len(tool.__name__) :].strip()
-                    try:
-                        return str(tool(arg))
-                    except Exception as exc:
-                        return f"Error running tool {tool.__name__}: {exc}"
+                    remainder = msg[len(tool.__name__) :].strip()
+                    parts = remainder.split()
+                    sig = inspect.signature(tool)
+                    if len(parts) == len(sig.parameters):
+                        try:
+                            return str(tool(*parts))
+                        except Exception as exc:
+                            return f"Error running tool {tool.__name__}: {exc}"
+                    if tool.__name__ == "food_security_analyst":
+                        from food_security import FoodSecurityHandler
+
+                        commodity = parts[0] if parts else ""
+                        agent.state[fs_key] = FoodSecurityHandler(
+                            {"commodity_name": commodity} if commodity else {}
+                        )
+                        first_prompt = agent.state[fs_key].collect(
+                            commodity_name=commodity or None
+                        )
+                        return f"Sure, to analyze {commodity}, could you tell me the price last month?" if commodity else first_prompt
+                    return f"Error running tool {tool.__name__}: incorrect arguments"
 
             weather_tool = next(
                 (t for t in agent.tools if t.__name__ == "get_weather"),
@@ -144,6 +193,8 @@ class Runner:
                 break
 
         def _tool_spec(func: Callable) -> Dict[str, Any]:
+            if hasattr(func, "openai_schema"):
+                return func.openai_schema  # type: ignore[return-value]
             sig = inspect.signature(func)
             params = {name: {"type": "string"} for name in sig.parameters}
             return {

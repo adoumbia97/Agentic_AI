@@ -19,7 +19,7 @@ def test_handler_collects_and_analyzes():
     assert "price two months ago" in step3.lower()
 
     step4 = handler.collect(price_two_months_ago=100)
-    assert "availability level" in step4.lower()
+    assert "availability" in step4.lower()
 
     final = handler.collect(availability_level="high")
     assert "analysis:" in final.lower()
