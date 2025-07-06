@@ -170,6 +170,61 @@ async def admin_list_users(admin: str = Depends(get_admin)):
 class UserStatusUpdate(BaseModel):
     active: bool
 
+async def process_message(user: str, text: str) -> str:
+    """Handle a single user message and return the assistant reply."""
+    ts = int(time.time() * 1000)
+    async with async_session() as session:
+        rec = await session.get(Usage, user)
+        if not rec:
+            rec = Usage(username=user)
+            session.add(rec)
+            await session.commit()
+            await session.refresh(rec)
+        if rec.first_request is None:
+            rec.first_request = ts
+        rec.messages += 1
+        rec.last_request = ts
+        rec.total_user_words += len(text.split())
+        session.add(rec)
+        session.add(
+            Message(
+                username=user,
+                role="user",
+                content=text,
+                timestamp=ts,
+            )
+        )
+        await session.commit()
+        result = await session.exec(
+            select(Message)
+            .where(Message.username == user)
+            .order_by(Message.timestamp)
+        )
+        chat_msgs = result.all()
+        chat_hist = [
+            {"role": "system", "content": agent.instructions}
+        ] + [
+            {"role": m.role, "content": m.content}
+            for m in chat_msgs
+        ]
+    result = await Runner.run(agent, input=chat_hist)
+    reply = result.final_output
+    reply_ts = int(time.time() * 1000)
+    async with async_session() as session:
+        rec = await session.get(Usage, user)
+        rec.total_bot_words += len(reply.split())
+        session.add(rec)
+        session.add(
+            Message(
+                username=user,
+                role="assistant",
+                content=reply,
+                timestamp=reply_ts,
+            )
+        )
+        await session.commit()
+    return reply
+
 @app.patch("/admin/users/{username}")
 async def admin_toggle_user(
     username: str,
@@ -216,53 +271,8 @@ async def websocket_chat(ws: WebSocket):
         if not msg:
             continue
 
-        ts = int(time.time() * 1000)
-        async with async_session() as session:
-            rec = await session.get(Usage, user)
-            if rec.first_request is None:
-                rec.first_request = ts
-            rec.messages += 1
-            rec.last_request = ts
-            rec.total_user_words += len(msg.split())
-            session.add(rec)
-            session.add(
-                Message(
-                    username=user,
-                    role="user",
-                    content=msg,
-                    timestamp=ts,
-                )
-            )
-            await session.commit()
-            result = await session.exec(
-                select(Message)
-                .where(Message.username == user)
-                .order_by(Message.timestamp)
-            )
-            chat_msgs = result.all()
-            chat_hist = [
-                {"role": "system", "content": agent.instructions}
-            ] + [
-                {"role": m.role, "content": m.content}
-                for m in chat_msgs
-            ]
-        result = await Runner.run(agent, input=chat_hist)
-        reply = result.final_output
-        reply_ts = int(time.time() * 1000)
-        async with async_session() as session:
-            rec = await session.get(Usage, user)
-            rec.total_bot_words += len(reply.split())
-            session.add(rec)
-            session.add(
-                Message(
-                    username=user,
-                    role="assistant",
-                    content=reply,
-                    timestamp=reply_ts,
-                )
-            )
-            await session.commit()
-
+        reply = await process_message(user, msg)
+        
         await ws.send_json({"reply": reply})
 
 # ─── OPTIONAL HTTP CHAT ───────────────────────────────────────
@@ -277,58 +287,7 @@ async def chat_http(
     req: ChatRequest,
     user: str = Depends(get_user),
 ):
-    ts = int(time.time() * 1000)
-    async with async_session() as session:
-        rec = await session.get(Usage, user)
-        if not rec:
-            rec = Usage(username=user)
-            session.add(rec)
-            await session.commit()
-            await session.refresh(rec)
-        if rec.first_request is None:
-            rec.first_request = ts
-        rec.messages += 1
-        rec.last_request = ts
-        rec.total_user_words += len(req.message.split())
-        session.add(rec)
-        session.add(
-            Message(
-                username=user,
-                role="user",
-                content=req.message,
-                timestamp=ts,
-            )
-        )
-        await session.commit()
-        result = await session.exec(
-            select(Message)
-            .where(Message.username == user)
-            .order_by(Message.timestamp)
-        )
-        chat_msgs = result.all()
-        chat_hist = [
-            {"role": "system", "content": agent.instructions}
-        ] + [
-            {"role": m.role, "content": m.content}
-            for m in chat_msgs
-        ]
-    result = await Runner.run(agent, input=chat_hist)
-    reply = result.final_output
-    reply_ts = int(time.time() * 1000)
-    async with async_session() as session:
-        rec = await session.get(Usage, user)
-        rec.total_bot_words += len(reply.split())
-        session.add(rec)
-        session.add(
-            Message(
-                username=user,
-                role="assistant",
-                content=reply,
-                timestamp=reply_ts,
-            )
-        )
-        await session.commit()
-
+    reply = await process_message(user, req.message)
     return ChatResponse(reply=reply)
 
 # ─── RUNNER ───────────────────────────────────────────────────
