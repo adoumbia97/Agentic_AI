@@ -70,7 +70,8 @@ class Runner:
         )
         if weather_tool:
             match = re.search(
-                r"(?:weather|umbrella).* in ([A-Za-z ]+)",
+                r"(?:weather|forecast|temperature|umbrella|rain)"
+                r".*(?:in|for) ([A-Za-z ]+)",
                 lowered,
             )
             if match:
