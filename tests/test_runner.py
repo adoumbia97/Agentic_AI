@@ -29,9 +29,22 @@ async def test_memory_absent():
 
 
 @pytest.mark.asyncio
+async def test_memory_last_message_phrase():
+    messages = [
+        {"role": "system", "content": "test"},
+        {"role": "user", "content": "hello"},
+        {"role": "assistant", "content": "Hello! How can I assist you today?"},
+        {"role": "user", "content": "what was my last message?"},
+    ]
+    result = await Runner.run(agent, input=messages)
+    assert result.final_output == "hello"
+
+
+@pytest.mark.asyncio
 async def test_weather_intent_parsing():
     result = await Runner.run(agent, input="What's the weather in Paris?")
     assert result.final_output == "The weather in Paris is sunny."
+
 
 @pytest.mark.asyncio
 async def test_weather_variations():

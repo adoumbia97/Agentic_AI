@@ -1,9 +1,9 @@
-from dataclasses import dataclass, field
-from typing import Callable, List, Union, Any, Dict
-import re
 import inspect
 import json
 import logging
+import re
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Union
 
 try:
     import openai
@@ -51,12 +51,23 @@ class Runner:
 
             lowered = msg.lower().strip()
 
-            if "what did i just say" in lowered and prev_user:
+            if (
+                any(
+                    phrase in lowered
+                    for phrase in [
+                        "what did i just say",
+                        "what was my last message",
+                        "what was my last question",
+                        "what did i just ask",
+                    ]
+                )
+                and prev_user
+            ):
                 return prev_user
 
             for tool in agent.tools:
                 if lowered.startswith(tool.__name__.lower()):
-                    arg = msg[len(tool.__name__):].strip()
+                    arg = msg[len(tool.__name__) :].strip()
                     try:
                         return str(tool(arg))
                     except Exception as exc:
@@ -122,9 +133,7 @@ class Runner:
             agent.logger.debug("[local] user=%s reply=%s", message, reply)
             return Result(reply)
 
-        messages = [
-            {"role": "system", "content": agent.instructions}
-        ] + agent.history
+        messages = [{"role": "system", "content": agent.instructions}] + agent.history
 
         print("Sending messages to OpenAI:", messages)
 
@@ -151,20 +160,18 @@ class Runner:
             response = await openai.ChatCompletion.acreate(
                 model="gpt-3.5-turbo-0613",
                 messages=messages,
-                functions=[_tool_spec(t) for t in agent.tools]
-                if requested_tool
-                else None,
-                function_call={"name": requested_tool.__name__}
-                if requested_tool
-                else "none",
+                functions=(
+                    [_tool_spec(t) for t in agent.tools] if requested_tool else None
+                ),
+                function_call=(
+                    {"name": requested_tool.__name__} if requested_tool else "none"
+                ),
             )
             print("OpenAI response:", response)
             msg = response.choices[0].message
             if msg.get("function_call"):
                 name = msg["function_call"]["name"]
-                args = json.loads(
-                    msg["function_call"].get("arguments", "{}")
-                )
+                args = json.loads(msg["function_call"].get("arguments", "{}"))
                 tool = next(
                     (t for t in agent.tools if t.__name__ == name),
                     None,
@@ -175,21 +182,23 @@ class Runner:
                         result = tool(**args)
                     except Exception as exc:
                         result = f"Error running tool {name}: {exc}"
-                agent.history.append({
-                    "role": "assistant",
-                    "content": "",
-                    "function_call": msg["function_call"],
-                })
-                agent.history.append({
-                    "role": "function",
-                    "name": name,
-                    "content": str(result),
-                })
+                agent.history.append(
+                    {
+                        "role": "assistant",
+                        "content": "",
+                        "function_call": msg["function_call"],
+                    }
+                )
+                agent.history.append(
+                    {
+                        "role": "function",
+                        "name": name,
+                        "content": str(result),
+                    }
+                )
                 follow = await openai.ChatCompletion.acreate(
                     model="gpt-3.5-turbo-0613",
-                    messages=[
-                        {"role": "system", "content": agent.instructions}
-                    ]
+                    messages=[{"role": "system", "content": agent.instructions}]
                     + agent.history,
                 )
                 final = follow.choices[0].message.content
