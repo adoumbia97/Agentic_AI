@@ -1,5 +1,10 @@
 import sys
 from pathlib import Path
+import os
+import openai
+
+os.environ.pop("OPENAI_API_KEY", None)
+openai.api_key = None
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))  # noqa: E402
 

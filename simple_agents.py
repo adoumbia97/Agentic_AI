@@ -15,6 +15,8 @@ try:
 except Exception:  # pragma: no cover - openai optional for tests
     openai = None
 
+from openai_config import load_api_key
+
 
 def function_tool(func: Callable) -> Callable:
     """Decorator to mark a function as an agent tool."""
@@ -170,6 +172,7 @@ class Runner:
             agent.history.append({"role": "user", "content": message})
             agent.history = agent.history[-history_size:]
 
+        load_api_key()
         if not openai or not getattr(openai, "api_key", None):
             reply = _simple_reply(message, agent.history)
             agent.history.append({"role": "assistant", "content": reply})

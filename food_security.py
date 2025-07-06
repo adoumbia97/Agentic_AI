@@ -6,6 +6,8 @@ try:
 except Exception:  # pragma: no cover - openai optional for tests
     openai = None
 
+from openai_config import load_api_key
+
 from simple_agents import function_tool
 
 # OpenAI-compatible function schema
@@ -93,8 +95,9 @@ class FoodSecurityHandler:
         prev = float(self.data["price_two_months_ago"])
         avail = self.data["availability_level"]
 
+        load_api_key()
         if not openai or not getattr(openai, "api_key", None):
-            return "Analysis: OpenAI API key not configured."
+            return "Analysis failed: OpenAI API key not configured."
 
         system_prompt = (
             "You are a professional food security analyst. Use the provided figures "
