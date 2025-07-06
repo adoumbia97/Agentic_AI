@@ -23,7 +23,7 @@ class Result:
 class Runner:
     @staticmethod
     async def run(agent: Agent, input: Union[str, List[dict]]) -> Result:
-        """Very small runner that echoes or executes a matching tool."""
+        """Lightweight runner that executes tools or returns canned responses."""
         # Extract message content
         if isinstance(input, list) and input:
             message = input[-1].get("content", "")
@@ -40,5 +40,16 @@ class Runner:
                     result = f"Error running tool {tool.__name__}: {exc}"
                 return Result(str(result))
 
-        # Default behaviour: echo message
-        return Result(message)
+        # Very small set of canned replies so the bot feels conversational
+        lowered = message.lower().strip()
+        if lowered in {"hi", "hello"}:
+            return Result("Hello! How can I assist you today?")
+        if lowered == "help":
+            return Result(
+                "You can ask me about the weather, fetch docs with 'fetch_doc', "
+                "show the current time with 'show_time', or clear history with "
+                "'clear history'."
+            )
+
+        # Default behaviour: generic fallback
+        return Result("I'm not sure how to help with that.")
