@@ -9,7 +9,7 @@ from fastapi.security.api_key import APIKeyQuery, APIKeyHeader
 from pydantic import BaseModel
 from agents import Agent, Runner, function_tool
 
-# ─── CONFIG ─────────────────────────────────────────────────
+# ─── CONFIG ───────────────────────────────────────────────────
 USER_API_KEYS  = {"user1-token": "user1", "user2-token": "user2"}
 ADMIN_API_KEYS = {"admin-token": "admin"}
 
@@ -17,37 +17,42 @@ API_KEY_NAME   = "access_token"
 api_key_query  = APIKeyQuery(name=API_KEY_NAME, auto_error=False)
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
+# track activation state
+user_status = {username: True for username in USER_API_KEYS.values()}
+
 def get_user(
     key_q: str = Depends(api_key_query),
     key_h: str = Depends(api_key_header),
 ):
     token = key_q or key_h
-    if token in USER_API_KEYS:
-        return USER_API_KEYS[token]
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid user API key",
-        headers={"WWW-Authenticate": "API key"},
-    )
+    if token not in USER_API_KEYS:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid user API key")
+    user = USER_API_KEYS[token]
+    if not user_status.get(user, False):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "User is deactivated")
+    return user
 
 def get_admin(
     key_q: str = Depends(api_key_query),
     key_h: str = Depends(api_key_header),
 ):
     token = key_q or key_h
-    if token in ADMIN_API_KEYS:
-        return ADMIN_API_KEYS[token]
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid admin API key",
-        headers={"WWW-Authenticate": "API key"},
-    )
+    if token not in ADMIN_API_KEYS:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid admin API key")
+    return ADMIN_API_KEYS[token]
 
-# ─── METRICS & STORAGE ───────────────────────────────────────
-usage         = defaultdict(lambda: {"conversations": 0, "messages": 0})
-conversations = defaultdict(list)  # user -> list of {who,text,ts}
+# ─── METRICS & STORAGE ─────────────────────────────────────────
+usage = defaultdict(lambda: {
+    "conversations":     0,
+    "messages":          0,
+    "first_request":     None,
+    "last_request":      None,
+    "total_user_words":  0,
+    "total_bot_words":   0,
+})
+conversations = defaultdict(list)  # user → list of {role, content, ts}
 
-# ─── AGENT SETUP ────────────────────────────────────────────
+# ─── AGENT SETUP ───────────────────────────────────────────────
 @function_tool
 def get_weather(city: str) -> str:
     return f"The weather in {city} is sunny."
@@ -60,60 +65,88 @@ agent = Agent(
 
 app = FastAPI()
 
-# ─── SERVE UI ───────────────────────────────────────────────
+# ─── SERVE FRONTEND ────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     return HTMLResponse(open("index.html", encoding="utf-8").read())
 
-@app.get("/admin", response_class=HTMLResponse)
-async def serve_admin():
-    return HTMLResponse(open("admin.html", encoding="utf-8").read())
-
-# ─── USER HISTORY ENDPOINT ──────────────────────────────────
+# ─── USER HISTORY & USAGE ──────────────────────────────────────
 @app.get("/history")
 async def get_history(user: str = Depends(get_user)):
     """
-    Return the logged-in user’s full conversation so far.
+    Return [{ who:'user'|'bot', text:str, ts:int }, ...]
     """
-    return {
-        "username": user,
-        "history": conversations[user]
-    }
+    mapped = []
+    for m in conversations[user]:
+        mapped.append({
+            "who": m["role"] == "assistant" and "bot" or "user",
+            "text": m["content"],
+            "ts": m["ts"],
+        })
+    return {"username": user, "history": mapped}
 
-# ─── USER USAGE ENDPOINT ────────────────────────────────────
 @app.get("/usage")
 async def user_usage(user: str = Depends(get_user)):
     """
-    Return the logged-in user’s usage + their username.
+    Return { username, conversations, messages,
+             first_request, last_request,
+             total_user_words, total_bot_words }
     """
+    u = usage[user]
     return {
-        "username": user,
-        **usage[user]
+        "username":            user,
+        "conversations":       u["conversations"],
+        "messages":            u["messages"],
+        "first_request":       u["first_request"],
+        "last_request":        u["last_request"],
+        "total_user_words":    u["total_user_words"],
+        "total_bot_words":     u["total_bot_words"],
     }
 
-# ─── ADMIN USAGE ENDPOINT ───────────────────────────────────
-@app.get("/admin/usage")
-async def admin_usage(admin: str = Depends(get_admin)):
+# ─── ADMIN: LIST & TOGGLE USERS ───────────────────────────────
+@app.get("/admin/users")
+async def admin_list_users(admin: str = Depends(get_admin)):
     """
-    Return *all* users’ usage plus the admin’s username.
+    Return all users with usage + activation status.
     """
     return {
         "username": admin,
-        "usage": usage
+        "users": {
+            u: {
+                **usage[u],
+                "active": user_status.get(u, False)
+            }
+            for u in USER_API_KEYS.values()
+        }
     }
 
-# ─── WEBSOCKET CHAT ────────────────────────────────────────
-conversations = defaultdict(list)  
-usage = defaultdict(lambda: {"conversations": 0, "messages": 0})
+class UserStatusUpdate(BaseModel):
+    active: bool
 
+@app.patch("/admin/users/{username}")
+async def admin_toggle_user(
+    username: str,
+    upd: UserStatusUpdate,
+    admin: str = Depends(get_admin),
+):
+    if username not in user_status:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown user")
+    user_status[username] = upd.active
+    return {"username": username, "active": upd.active}
+
+# ─── WEBSOCKET CHAT ───────────────────────────────────────────
 @app.websocket("/ws/chat")
 async def websocket_chat(ws: WebSocket):
-    token = ws.query_params.get("access_token")
+    token = ws.query_params.get(API_KEY_NAME)
     if token not in USER_API_KEYS:
         await ws.close(code=1008)
         return
 
     user = USER_API_KEYS[token]
+    if not user_status.get(user, False):
+        await ws.close(code=1008)
+        return
+
     usage[user]["conversations"] += 1
     await ws.accept()
 
@@ -128,58 +161,31 @@ async def websocket_chat(ws: WebSocket):
             continue
 
         ts = int(time.time() * 1000)
-        # 1) store the user message with a valid role
-        conversations[user].append({
-            "role":    "user",
-            "content": msg,
-            "ts":      ts
-        })
-        usage[user]["messages"] += 1
+        u = usage[user]
+        # first request?
+        if u["first_request"] is None:
+            u["first_request"] = ts
+        u["messages"]      += 1
+        u["last_request"]  = ts
+        u["total_user_words"] += len(msg.split())
 
-        # 2) build the OpenAI‐compatible history
-        chat_messages = [
-            {"role": "system",    "content": agent.instructions}
-        ] + [
-            {"role": m["role"],  "content": m["content"]}
-            for m in conversations[user]
-        ]
-
-        # 3) call your agent
-        result = await Runner.run(agent, input=chat_messages)
+        # store and call
+        conversations[user].append({"role": "user", "content": msg, "ts": ts})
+        # build OpenAI chat history
+        chat_hist = (
+            [{"role": "system", "content": agent.instructions}]
+            + [{"role": m["role"], "content": m["content"]}
+               for m in conversations[user]]
+        )
+        result = await Runner.run(agent, input=chat_hist)
         reply = result.final_output
 
-        # 4) store the assistant reply
-        conversations[user].append({
-            "role":    "assistant",
-            "content": reply,
-            "ts":      ts
-        })
+        u["total_bot_words"] += len(reply.split())
+        conversations[user].append({"role": "assistant", "content": reply, "ts": ts})
 
         await ws.send_json({"reply": reply})
 
-
-        
-
-
-# ─── History ────────────────────────────────────
-@app.get("/history")
-async def get_history(user: str = Depends(get_user)):
-    """
-    Returns each message as { who: "user"|"bot", text: "...", ts }.
-    """
-    mapped = []
-    for m in conversations[user]:
-        mapped.append({
-            "who": m["role"] == "assistant" and "bot" or "user",
-            "text": m["content"],
-            "ts": m["ts"]
-        })
-    return {
-        "username": user,
-        "history": mapped
-    }
-
-# ─── OPTIONAL HTTP CHAT ────────────────────────────────────
+# ─── OPTIONAL HTTP CHAT ───────────────────────────────────────
 class ChatRequest(BaseModel):
     message: str
 
@@ -191,16 +197,29 @@ async def chat_http(
     req: ChatRequest,
     user: str = Depends(get_user),
 ):
-    ts = int(time.time()*1000)
-    usage[user]["messages"] += 1
-    conversations[user].append({"who": "user", "text": req.message, "ts": ts})
+    ts = int(time.time() * 1000)
+    u = usage[user]
+    if u["first_request"] is None:
+        u["first_request"] = ts
+    u["messages"]      += 1
+    u["last_request"]   = ts
+    u["total_user_words"] += len(req.message.split())
 
-    result = await Runner.run(agent, input=conversations[user])
-    conversations[user].append({"who": "bot", "text": result.final_output, "ts": ts})
+    conversations[user].append({"role": "user", "content": req.message, "ts": ts})
+    chat_hist = (
+        [{"role": "system", "content": agent.instructions}]
+        + [{"role": m["role"], "content": m["content"]}
+           for m in conversations[user]]
+    )
+    result = await Runner.run(agent, input=chat_hist)
+    reply = result.final_output
 
-    return ChatResponse(reply=result.final_output)
+    u["total_bot_words"] += len(reply.split())
+    conversations[user].append({"role": "assistant", "content": reply, "ts": ts})
 
-# ─── RUNNER ───────────────────────────────────────────────
+    return ChatResponse(reply=reply)
+
+# ─── RUNNER ───────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("chatbot_server:app", host="0.0.0.0", port=8000, reload=True)

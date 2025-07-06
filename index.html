@@ -4,42 +4,44 @@
   <meta charset="utf-8">
   <title>🚀 Professional Agent App</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <!-- Bootstrap 5 CSS -->
+  <!-- Bootswatch “Flatly” theme -->
   <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.0/dist/flatly/bootstrap.min.css"
     rel="stylesheet"
   >
   <style>
     body { height:100vh; display:flex; flex-direction:column; }
-    #chat { flex:1; overflow-y:auto; padding:1rem; background:#e9ecef; }
+    /* Chat card sizing */
+    #chat-card { max-width:700px; margin:1rem auto; }
+    #chat { height:400px; overflow-y:auto; background:#e9ecef; padding:1rem; }
+    /* Bubbles */
     .bubble { max-width:70%; padding:.75rem; border-radius:12px; }
-    .bubble.user { background:#0d6efd; color:#fff; margin-left:auto;
-                   border-bottom-right-radius:0; }
-    .bubble.bot  { background:#f8f9fa; color:#212529; margin-right:auto;
-                   border:1px solid #dee2e6; border-bottom-left-radius:0; }
-    .timestamp { font-size:.75rem; color:#6c757d; }
+    .bubble.user { background:#0d6efd; color:#fff; margin-left:auto; border-bottom-right-radius:0; }
+    .bubble.bot  { background:#f8f9fa; color:#212529; margin-right:auto; border:1px solid #dee2e6; border-bottom-left-radius:0; }
+    .timestamp   { font-size:.75rem; color:#6c757d; margin-top:.25rem; }
+    /* Smaller controls */
     .form-control-sm { height: calc(1.5em + .5rem + 2px); }
     .btn-sm         { font-size:.875rem; padding:.25rem .5rem; }
   </style>
 </head>
 <body>
 
-  <!-- NAVBAR with Tabs -->
-  <nav class="navbar navbar-expand bg-dark navbar-dark">
+  <!-- NAVBAR -->
+  <nav class="navbar navbar-expand bg-primary navbar-dark">
     <div class="container-fluid">
       <a class="navbar-brand" href="#">Agent App</a>
-      <ul class="nav nav-tabs ms-auto" id="mainTabs" role="tablist">
+      <ul class="nav nav-tabs ms-auto">
         <li class="nav-item">
-          <a class="nav-link active" id="tab-chat" data-bs-toggle="tab" href="#pane-chat">Chat</a>
+          <a class="nav-link active" data-bs-toggle="tab" href="#pane-chat">Chat</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link"    id="tab-admin" data-bs-toggle="tab" href="#pane-admin">Admin</a>
+          <a class="nav-link" data-bs-toggle="tab" href="#pane-admin">Admin</a>
         </li>
       </ul>
     </div>
   </nav>
 
-  <!-- LOGIN ROW -->
+  <!-- LOGIN & CONTROLS -->
   <div class="container py-2">
     <div class="row g-2 align-items-center">
       <div class="col-auto">
@@ -63,8 +65,8 @@
         </button>
       </div>
       <div class="col-auto" id="user-ops" style="display:none;">
-        <button id="new-conv" class="btn btn-sm btn-outline-secondary">New Conversation</button>
-        <button id="usage-btn" class="btn btn-sm btn-outline-info">My Usage</button>
+        <button id="new-conv" class="btn btn-sm btn-outline-light">New Conversation</button>
+        <button id="usage-btn" class="btn btn-sm btn-outline-light">My Usage</button>
       </div>
       <div class="col-auto">
         <span id="user-label" class="fw-semibold"></span>
@@ -75,43 +77,60 @@
 
   <!-- TAB CONTENT -->
   <div class="tab-content flex-grow-1">
+
     <!-- CHAT PANE -->
-    <div class="tab-pane fade show active h-100 d-flex flex-column" id="pane-chat">
-      <div id="chat" class="flex-grow-1"></div>
-      <div class="container py-2">
-        <div class="input-group input-group-sm">
-          <input
-            id="msg-input"
-            type="text"
-            class="form-control form-control-sm"
-            placeholder="Type your message…"
-            disabled
-          />
-          <button id="send-btn" class="btn btn-sm btn-success" disabled>Send</button>
+    <div class="tab-pane fade show active" id="pane-chat">
+      <div id="chat-card" class="card shadow-sm">
+        <div id="chat" class="card-body"></div>
+        <div class="card-footer bg-white">
+          <div class="input-group input-group-sm">
+            <input
+              id="msg-input"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="Type your message…"
+              disabled
+            />
+            <button id="send-btn" class="btn btn-sm btn-success" disabled>Send</button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- ADMIN PANE -->
     <div class="tab-pane fade p-4" id="pane-admin">
-      <h5>🔒 Admin Dashboard</h5>
-      <table class="table table-bordered table-sm mt-3">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Conversations</th>
-            <th>Messages</th>
-          </tr>
-        </thead>
-        <tbody id="admin-body"></tbody>
-      </table>
+      <div class="card shadow-sm mx-auto" style="max-width:900px;">
+        <div class="card-header bg-light">
+          <h5 class="mb-0">🔒 Admin Dashboard</h5>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>User</th>
+                <th>Active</th>
+                <th>Conversations</th>
+                <th>Messages</th>
+                <th>First Request</th>
+                <th>Last Request</th>
+                <th>User Words</th>
+                <th>Bot Words</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="admin-body"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
+
   </div>
 
   <!-- Bootstrap JS bundle -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
   (function(){
+    // DOM refs
     const roleSelect = document.getElementById('role-select');
     const tokenInput = document.getElementById('token-input');
     const loginBtn   = document.getElementById('login-btn');
@@ -121,7 +140,6 @@
     const usageBtn   = document.getElementById('usage-btn');
     const userOps    = document.getElementById('user-ops');
     const userLabel  = document.getElementById('user-label');
-
     const msgInput   = document.getElementById('msg-input');
     const sendBtn    = document.getElementById('send-btn');
     const chatDiv    = document.getElementById('chat');
@@ -129,97 +147,87 @@
 
     let ws, history = [];
 
-    function showAlert(msg,type='danger') {
+    function showAlert(msg, type='danger') {
       alertArea.innerHTML = `
         <div class="alert alert-${type} alert-dismissible fade show">
           ${msg}
           <button class="btn-close" data-bs-dismiss="alert"></button>
         </div>`;
     }
-    function clearAlert(){ alertArea.innerHTML = ''; }
+    function clearAlert() {
+      alertArea.innerHTML = '';
+    }
 
-    function appendBubble(who,text,ts){
+    function appendBubble(who, text, ts) {
       const wrap = document.createElement('div');
-      const b    = document.createElement('div');
-      b.className = 'bubble ' + who;
-      b.textContent = text;
-      const t = document.createElement('div');
-      t.className = 'timestamp';
-      t.textContent = new Date(ts).toLocaleTimeString([], {
-        hour:'2-digit',minute:'2-digit'
-      });
-      wrap.append(b,t);
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble ' + who;
+      bubble.textContent = text;
+      const time = document.createElement('div');
+      time.className = 'timestamp';
+      time.textContent = new Date(ts).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+      wrap.append(bubble, time);
       chatDiv.append(wrap);
       chatDiv.scrollTop = chatDiv.scrollHeight;
     }
 
-    function setLoggedIn(role, username){
+    function setLoggedIn(role, username) {
+      // disable login controls
       roleSelect.disabled = true;
       tokenInput.disabled  = true;
       loginBtn.style.display  = 'none';
       logoutBtn.style.display = 'inline-block';
       clearAlert();
-      userLabel.textContent = role === 'user'
+      userLabel.textContent = role==='user'
                            ? `👤 ${username}`
                            : `🔑 Admin: ${username}`;
 
-      if(role==='user'){
+      if (role === 'user') {
+        // show user ops
         userOps.style.display = 'inline-flex';
         msgInput.disabled = false;
         sendBtn.disabled  = false;
-        // load past history
+
+        // load conversation history
         fetch(`/history?access_token=${localStorage.app_token}`)
-          .then(r=>r.json())
-          .then(d=>{
+          .then(r => r.json())
+          .then(d => {
             history = d.history;
             chatDiv.innerHTML = '';
-            history.forEach(m=>appendBubble(m.who,m.text,m.ts));
+            history.forEach(m => appendBubble(m.who, m.text, m.ts));
+          }).catch(() => {
+            showAlert('Failed to load history.', 'warning');
           });
-        // connect WS
+
+        // open WebSocket
         ws = new WebSocket(`ws://${location.host}/ws/chat?access_token=${localStorage.app_token}`);
-        ws.onmessage = e=>{
+        ws.onmessage = e => {
           const {reply} = JSON.parse(e.data);
           const ts = Date.now();
-          history.push({who:'bot',text:reply,ts});
-          appendBubble('bot',reply,ts);
+          history.push({who:'bot', text:reply, ts});
+          appendBubble('bot', reply, ts);
         };
-        ws.onclose = ev=>{
-          if(ev.code===1008){
-            showAlert('❌ Invalid API Key – please login again.','warning');
+        ws.onclose = ev => {
+          if (ev.code === 1008) {
+            showAlert('❌ You are deactivated or invalid key.','warning');
             setLoggedOut();
           }
         };
+
       } else {
+        // admin mode
         userOps.style.display = 'none';
         msgInput.disabled = true;
         sendBtn.disabled  = true;
-        // load admin usage
-        fetch(`/admin/usage?access_token=${localStorage.app_token}`)
-          .then(r=>{
-            if(!r.ok) throw 0;
-            return r.json();
-          })
-          .then(d=>{
-            adminBody.innerHTML = '';
-            Object.entries(d.usage).forEach(([u,st])=>{
-              adminBody.insertAdjacentHTML('beforeend',`
-                <tr>
-                  <td>${u}</td>
-                  <td>${st.conversations}</td>
-                  <td>${st.messages}</td>
-                </tr>`);
-            });
-          })
-          .catch(_=> {
-            showAlert('❌ Invalid admin key – please login again.','warning');
-            setLoggedOut();
-          });
+
+        loadAdminUsers();
       }
     }
 
-    function setLoggedOut(){
+    function setLoggedOut() {
       localStorage.removeItem('app_token');
       localStorage.removeItem('app_role');
+      localStorage.removeItem('app_username');
       roleSelect.disabled = false;
       tokenInput.disabled = false;
       loginBtn.style.display  = 'inline-block';
@@ -231,57 +239,117 @@
       chatDiv.innerHTML = '';
       adminBody.innerHTML = '';
       clearAlert();
-      if(ws) ws.close();
+      if (ws) ws.close();
       history = [];
     }
 
-    // send message
-    sendBtn.onclick = ()=>{
+    // send message on click or Enter
+    sendBtn.onclick = () => {
       const txt = msgInput.value.trim();
-      if(!txt) return;
+      if (!txt) return;
       const ts = Date.now();
-      history.push({who:'user',text:txt,ts});
-      appendBubble('user',txt,ts);
-      ws.send(JSON.stringify({message:txt}));
+      history.push({who:'user', text:txt, ts});
+      appendBubble('user', txt, ts);
+      ws.send(JSON.stringify({message: txt}));
       msgInput.value = '';
     };
+    msgInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !sendBtn.disabled) sendBtn.click();
+    });
 
     // new conversation
-    newConv.onclick = ()=>{
-      history=[];
-      chatDiv.innerHTML='';
-      if(ws) ws.close();
-      // force new convo on server
-      setLoggedIn('user', localStorage.getItem('app_username'));
+    newConv.onclick = () => {
+      history = [];
+      chatDiv.innerHTML = '';
+      if (ws) ws.close();
+      // reconnect to start fresh
+      setLoggedIn('user', localStorage.app_username);
     };
 
-    // view usage
-    usageBtn.onclick = ()=>{
+    // user usage alert
+    usageBtn.onclick = () => {
       fetch(`/usage?access_token=${localStorage.app_token}`)
-        .then(r=>r.json())
-        .then(d=> showAlert(
-           `📊 ${d.username}: convs=${d.conversations}, msgs=${d.messages}`,
-           'info'
-        ));
+        .then(r => r.json())
+        .then(d => {
+          const last = d.last_request
+                     ? new Date(d.last_request).toLocaleString()
+                     : '-';
+          showAlert(
+            `📊 ${d.username}: convs=${d.conversations}, msgs=${d.messages}, last=${last}`,
+            'info'
+          );
+        }).catch(() => {
+          showAlert('Failed to fetch usage.', 'warning');
+        });
     };
+
+    // admin: load users & controls
+    function loadAdminUsers() {
+      const token = localStorage.app_token;
+      fetch(`/admin/users?access_token=${token}`)
+        .then(r => {
+          if (!r.ok) throw 0;
+          return r.json();
+        })
+        .then(d => {
+          adminBody.innerHTML = '';
+          Object.entries(d.users).forEach(([user, info]) => {
+            const first = info.first_request
+                        ? new Date(info.first_request).toLocaleString()
+                        : '-';
+            const last  = info.last_request
+                        ? new Date(info.last_request).toLocaleString()
+                        : '-';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${user}</td>
+              <td>${info.active ? '✅' : '❌'}</td>
+              <td>${info.conversations}</td>
+              <td>${info.messages}</td>
+              <td>${first}</td>
+              <td>${last}</td>
+              <td>${info.total_user_words}</td>
+              <td>${info.total_bot_words}</td>
+              <td>
+                <button class="btn btn-sm btn-${info.active ? 'danger' : 'success'}">
+                  ${info.active ? 'Deactivate' : 'Activate'}
+                </button>
+              </td>`;
+            const btn = tr.querySelector('button');
+            btn.onclick = () => {
+              fetch(
+                `/admin/users/${user}?access_token=${token}`,
+                {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({active: !info.active})
+                }
+              ).then(loadAdminUsers);
+            };
+            adminBody.appendChild(tr);
+          });
+        })
+        .catch(() => {
+          showAlert('❌ Invalid admin key – please login again.', 'warning');
+          setLoggedOut();
+        });
+    }
 
     // login flow
-    loginBtn.onclick = async ()=>{
+    loginBtn.onclick = async () => {
       const token = tokenInput.value.trim();
       const role  = roleSelect.value;
-      if(!token){
+      if (!token) {
         showAlert('API Key cannot be empty.');
         return;
       }
-      // choose correct endpoint
       const path = role==='user'
                  ? `/usage?access_token=${token}`
                  : `/admin/usage?access_token=${token}`;
       try {
         const resp = await fetch(path);
-        if(!resp.ok) throw 0;
+        if (!resp.ok) throw 0;
         const data = await resp.json();
-        // save token & role & username
         localStorage.app_token    = token;
         localStorage.app_role     = role;
         localStorage.app_username = data.username;
@@ -294,16 +362,15 @@
 
     logoutBtn.onclick = setLoggedOut;
 
-    // on load: restore session
-    window.addEventListener('load',()=>{
+    // restore session on page load
+    window.addEventListener('load', () => {
       const tok  = localStorage.app_token;
       const role = localStorage.app_role;
       const user = localStorage.app_username;
-      if(tok && role && user){
+      if (tok && role && user) {
         setLoggedIn(role, user);
       }
     });
-
   })();
   </script>
 </body>
