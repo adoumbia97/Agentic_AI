@@ -47,14 +47,6 @@ class FoodSecurityHandler:
 
     data: Dict[str, Any] = field(default_factory=dict)
 
-    prompts = {
-        "commodity_name": "What commodity would you like to analyze?",
-        "price_last_month": "What was its price last month?",
-        "price_two_months_ago": "What was its price two months ago?",
-        "availability_level": (
-            "What is the availability level? (high/moderate/low)"
-        ),
-    }
     order = [
         "commodity_name",
         "price_last_month",
@@ -67,7 +59,16 @@ class FoodSecurityHandler:
         self.data.update({k: v for k, v in kwargs.items() if v is not None})
         for key in self.order:
             if key not in self.data:
-                return self.prompts[key]
+                if key == "commodity_name":
+                    return "What commodity would you like to analyze?"
+                if key == "price_last_month":
+                    item = self.data.get("commodity_name", "it")
+                    return f"Sure, to analyze {item}, could you tell me the price last month?"
+                if key == "price_two_months_ago":
+                    return "And what was the price two months ago?"
+                if key == "availability_level":
+                    item = self.data.get("commodity_name", "it")
+                    return f"How is {item} availability now: high, moderate, or low?"
         return self._analysis()
 
     def _analysis(self) -> str:
@@ -110,3 +111,6 @@ def food_security_analyst(
         }
     )
     return handler.collect()
+
+
+food_security_analyst.openai_schema = FOOD_SECURITY_SCHEMA
