@@ -1,8 +1,9 @@
 import time
+from pathlib import Path
 from collections import defaultdict
 from fastapi import (
     FastAPI, WebSocket, WebSocketDisconnect,
-    Depends, HTTPException, status
+    Depends, HTTPException, status, UploadFile, File
 )
 from fastapi.responses import HTMLResponse
 from fastapi.security.api_key import APIKeyQuery, APIKeyHeader
@@ -51,6 +52,8 @@ usage = defaultdict(lambda: {
     "total_bot_words":   0,
 })
 conversations = defaultdict(list)  # user → list of {role, content, ts}
+DOCS_DIR = Path("docs")
+DOCS_DIR.mkdir(exist_ok=True)
 
 # ─── AGENT SETUP ───────────────────────────────────────────────
 @function_tool
@@ -133,6 +136,32 @@ async def admin_toggle_user(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown user")
     user_status[username] = upd.active
     return {"username": username, "active": upd.active}
+
+@app.post("/admin/docs")
+async def upload_document(
+    file: UploadFile = File(...),
+    admin: str = Depends(get_admin),
+):
+    dest = DOCS_DIR / file.filename
+    with dest.open("wb") as f:
+        f.write(await file.read())
+    return {"filename": file.filename}
+
+@app.get("/admin/history/{username}")
+async def admin_history(
+    username: str,
+    admin: str = Depends(get_admin),
+):
+    msgs = conversations.get(username, [])
+    mapped = [
+        {
+            "who": m["role"] == "assistant" and "bot" or "user",
+            "text": m["content"],
+            "ts": m["ts"],
+        }
+        for m in msgs
+    ]
+    return {"username": username, "history": mapped}
 
 # ─── WEBSOCKET CHAT ───────────────────────────────────────────
 @app.websocket("/ws/chat")
