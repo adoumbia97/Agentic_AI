@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict
+import logging
 
 try:
     import openai
@@ -8,7 +9,7 @@ except Exception:  # pragma: no cover - openai optional for tests
 
 from openai_config import load_api_key, get_client
 
-from simple_agents import function_tool
+from simple_agents import function_tool, _msg_attr
 
 # OpenAI-compatible tool schema
 FOOD_SECURITY_SCHEMA = {
@@ -130,7 +131,15 @@ class FoodSecurityHandler:
                 ],
             )
             client.close()
-            text = response.choices[0].message.content.strip()
+            try:
+                choice = response.choices[0]
+                msg = _msg_attr(choice, "message")
+                text = str(_msg_attr(msg, "content", "")).strip()
+            except Exception:
+                logging.getLogger(__name__).error(
+                    "Invalid food security response structure: %s", response
+                )
+                text = ""
             if not text.lower().startswith("analysis"):
                 text = f"Analysis: {text}"
             return text
