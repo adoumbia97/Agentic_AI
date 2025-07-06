@@ -60,10 +60,24 @@ DOCS_DIR.mkdir(exist_ok=True)
 def get_weather(city: str) -> str:
     return f"The weather in {city} is sunny."
 
+@function_tool
+def show_time(_: str = "") -> str:
+    """Return the current server time."""
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
+@function_tool
+def fetch_doc(name: str) -> str:
+    """Return the contents of a document stored in docs/."""
+    path = DOCS_DIR / name
+    if not path.exists():
+        return "Document not found."
+    return path.read_text()
+
 agent = Agent(
-    name="Hello world",
-    instructions="You are a helpful agent.",
-    tools=[get_weather],
+    name="Utility Bot",
+    instructions="You are a helpful assistant. You can show the current time, "
+                 "fetch documents, or give general guidance.",
+    tools=[get_weather, show_time, fetch_doc],
 )
 
 app = FastAPI()
@@ -189,6 +203,11 @@ async def websocket_chat(ws: WebSocket):
         if not msg:
             continue
 
+        if msg.lower() == "clear history":
+            conversations[user].clear()
+            await ws.send_json({"reply": "History cleared."})
+            continue
+
         ts = int(time.time() * 1000)
         u = usage[user]
         # first request?
@@ -227,6 +246,10 @@ async def chat_http(
     user: str = Depends(get_user),
 ):
     ts = int(time.time() * 1000)
+    if req.message.strip().lower() == "clear history":
+        conversations[user].clear()
+        return ChatResponse(reply="History cleared.")
+
     u = usage[user]
     if u["first_request"] is None:
         u["first_request"] = ts
