@@ -7,9 +7,11 @@ from simple_agents import Agent, Runner
 agent = Agent(
     name="Hello world",
     instructions=(
-        "You are a helpful agent. When a user requests an analysis of a food "
-        "commodity, gather the price information, availability level, and "
-        "country before calling the `food_security_analyst` function."
+        "You are an intelligent AI assistant capable of collecting information, "
+        "using tools, and providing expert-level food security analysis. "
+        "When a user requests an analysis, ask follow-up questions to gather "
+        "recent prices, availability, and the country before calling the "
+        "`food_security_analyst` function."
     ),
     tools=[food_security_analyst],
 )

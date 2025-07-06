@@ -21,11 +21,11 @@ from food_security import food_security_analyst
 from simple_agents import Agent, Runner
 
 SYSTEM_PROMPT = (
-    "You are a helpful assistant with expertise in food security and commodity "
-    "price analysis. When a user wants to analyze a commodity, collect the "
-    "commodity name, recent prices, availability level, and country in a "
-    "step-by-step manner and then call the `food_security_analyst` tool to "
-    "produce the final assessment."
+    "You are an intelligent AI assistant capable of multi-step reasoning and "
+    "expert food security analysis. Collect the commodity name, recent price "
+    "history, availability level, and target country before invoking the "
+    "`food_security_analyst` tool. Maintain context and clearly confirm any "
+    "assumptions or missing data before you act."
 )
 
 # ─── CONFIG ───────────────────────────────────────────────────

@@ -116,6 +116,9 @@ class Runner:
                 from food_security import FoodSecurityHandler
 
                 handler: FoodSecurityHandler = agent.state[fs_key]
+                if "summary" in lowered or "progress" in lowered:
+                    return handler.summary()
+
                 prompt = handler.collect(**_parse_food_security_reply(lowered, handler))
                 if "analysis:" in prompt.lower():
                     agent.state.pop(fs_key, None)
@@ -127,10 +130,14 @@ class Runner:
 
                 commodity = match.group(1)
                 agent.state[fs_key] = FoodSecurityHandler({"commodity_name": commodity})
+                agent.state["goal"] = f"Analyze food security for {commodity}"
                 return (
                     f"Sure, I can help with a food security analysis. Let's start. "
                     f"What was the price of {commodity} last month?"
                 )
+
+            if "what" in lowered and "goal" in lowered:
+                return agent.state.get("goal", "No specific goal has been set.")
 
             for tool in agent.tools:
                 if lowered.startswith(tool.__name__.lower()):

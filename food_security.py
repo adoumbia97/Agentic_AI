@@ -71,6 +71,17 @@ class FoodSecurityHandler:
         "country",
     ]
 
+    def summary(self) -> str:
+        """Return a summary of collected values and what is still needed."""
+        parts = []
+        for key in self.order:
+            label = key.replace("_", " ").capitalize()
+            if key in self.data:
+                parts.append(f"{label}: {self.data[key]}")
+            else:
+                parts.append(f"{label}: ?")
+        return "Progress so far:\n" + "\n".join(parts)
+
     def collect(self, **kwargs) -> str:
         """Collect fields and return either a prompt or the final analysis."""
         self.data.update({k: v for k, v in kwargs.items() if v is not None})
