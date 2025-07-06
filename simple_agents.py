@@ -5,7 +5,10 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Union
+
+if TYPE_CHECKING:  # pragma: no cover - used for linting only
+    from food_security import FoodSecurityHandler
 
 try:
     import openai
@@ -272,14 +275,14 @@ class Runner:
             else:
                 final = msg.get("content", "")
             if not final.strip():
-                final = "..."
+                final = "Hmm, something went wrong. Can you try again?"
             agent.history.append({"role": "assistant", "content": final})
             agent.history = agent.history[-history_size:]
             agent.logger.debug("[openai] user=%s reply=%s", message, final)
             return Result(final)
         except Exception as exc:
             agent.logger.exception("OpenAI request failed: %s", exc)
-            reply = _simple_reply(message, agent.history)
+            reply = "Hmm, something went wrong. Can you try again?"
             agent.history.append({"role": "assistant", "content": reply})
             agent.history = agent.history[-history_size:]
             return Result(reply)

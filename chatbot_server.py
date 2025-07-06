@@ -21,8 +21,9 @@ from food_security import food_security_analyst
 from simple_agents import Agent, Runner, function_tool
 
 SYSTEM_PROMPT = (
-    "You are a helpful assistant specialized in food security, climate change, "
-    "and data science."
+    "You are a helpful assistant with expertise in food security, "
+    "commodity price analysis, and humanitarian decision-making. "
+    "Guide the user step-by-step."
 )
 
 # ─── CONFIG ───────────────────────────────────────────────────

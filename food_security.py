@@ -94,7 +94,9 @@ class FoodSecurityHandler:
             f"Price two months ago: {prev}\n"
             f"Availability: {avail}\n\n"
             f"Analysis: The price has {trend} by {pct:.1f}% compared with two months ago "
-            f"and {availability_text}."
+            f"and {availability_text}. This change could affect household purchasing "
+            f"power and market stability. Ongoing monitoring and potential mitigation "
+            f"measures may be required if the trend persists."
         )
 
 

@@ -67,6 +67,7 @@
       </div>
       <div class="col-auto" id="user-ops" style="display:none;">
         <button id="new-conv" class="btn btn-sm btn-outline-light">New Conversation</button>
+        <button id="restart-btn" class="btn btn-sm btn-outline-light">Restart Session</button>
         <button id="usage-btn" class="btn btn-sm btn-outline-light">My Usage</button>
       </div>
       <div class="col-auto">
@@ -157,6 +158,7 @@
     const logoutBtn  = document.getElementById('logout-btn');
     const alertArea  = document.getElementById('alert-area');
     const newConv    = document.getElementById('new-conv');
+    const restartBtn = document.getElementById('restart-btn');
     const usageBtn   = document.getElementById('usage-btn');
     const userOps    = document.getElementById('user-ops');
     const userLabel  = document.getElementById('user-label');
@@ -333,6 +335,11 @@
         // reconnect to start fresh
         setLoggedIn('user', localStorage.app_username);
       });
+    };
+
+    // restart session
+    restartBtn.onclick = () => {
+      newConv.click();
     };
 
     // user usage alert
