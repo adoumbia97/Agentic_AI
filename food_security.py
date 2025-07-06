@@ -1,6 +1,11 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict
 
+try:
+    import openai
+except Exception:  # pragma: no cover - openai optional for tests
+    openai = None
+
 from simple_agents import function_tool
 
 # OpenAI-compatible function schema
@@ -30,12 +35,17 @@ FOOD_SECURITY_SCHEMA = {
                 "enum": ["high", "moderate", "low"],
                 "description": "Current availability level",
             },
+            "country": {
+                "type": "string",
+                "description": "Country of interest",
+            },
         },
         "required": [
             "commodity_name",
             "price_last_month",
             "price_two_months_ago",
             "availability_level",
+            "country",
         ],
     },
 }
@@ -52,6 +62,7 @@ class FoodSecurityHandler:
         "price_last_month",
         "price_two_months_ago",
         "availability_level",
+        "country",
     ]
 
     def collect(self, **kwargs) -> str:
@@ -69,13 +80,49 @@ class FoodSecurityHandler:
                 if key == "availability_level":
                     item = self.data.get("commodity_name", "it")
                     return f"How is {item} availability now: high, moderate, or low?"
+                if key == "country":
+                    item = self.data.get("commodity_name", "this commodity")
+                    return f"Which country are we assessing for {item}?"
         return self._analysis()
 
     def _analysis(self) -> str:
         name = self.data["commodity_name"]
+        country = self.data["country"]
         last = float(self.data["price_last_month"])
         prev = float(self.data["price_two_months_ago"])
         avail = self.data["availability_level"].lower()
+
+        prompt = (
+            "Act as a food security analyst. "
+            "Given the following details, provide a deep and realistic market analysis. "
+            "Use at least 8 sentences and consider potential shocks such as conflict, "
+            "climate events, or policy changes. Start your reply with 'Analysis:'"
+        )
+
+        user_content = (
+            f"Commodity: {name}\n"
+            f"Country: {country}\n"
+            f"Price last month: {last}\n"
+            f"Price two months ago: {prev}\n"
+            f"Availability level: {avail}"
+        )
+
+        if openai and getattr(openai, "api_key", None):
+            try:
+                resp = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo-0613",
+                    messages=[
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": user_content},
+                    ],
+                )
+                text = resp.choices[0].message.content.strip()
+                if not text.lower().startswith("analysis"):
+                    text = f"Analysis: {text}"
+                return text
+            except Exception:
+                pass
+
         change = last - prev
         pct = (change / prev) * 100 if prev else 0
         trend = (
@@ -90,6 +137,7 @@ class FoodSecurityHandler:
         }.get(avail, "availability information is unclear")
         return (
             f"Commodity: {name}\n"
+            f"Country: {country}\n"
             f"Price last month: {last}\n"
             f"Price two months ago: {prev}\n"
             f"Availability: {avail}\n\n"
@@ -106,6 +154,7 @@ def food_security_analyst(
     price_last_month: float,
     price_two_months_ago: float,
     availability_level: str,
+    country: str,
 ) -> str:
     """Return expert food security analysis."""
     handler = FoodSecurityHandler(
@@ -114,6 +163,7 @@ def food_security_analyst(
             "price_last_month": price_last_month,
             "price_two_months_ago": price_two_months_ago,
             "availability_level": availability_level,
+            "country": country,
         }
     )
     return handler.collect()

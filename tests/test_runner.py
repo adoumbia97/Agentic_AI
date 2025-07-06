@@ -6,16 +6,11 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))  # noqa: E402
 import pytest  # noqa: E402
 
 from food_security import food_security_analyst  # noqa: E402
-from simple_agents import Agent, Runner, function_tool  # noqa: E402
-
-
-@function_tool
-def get_weather(city: str) -> str:
-    return f"The weather in {city} is sunny."
+from simple_agents import Agent, Runner  # noqa: E402
 
 
 agent = Agent(
-    name="Test", instructions="Test agent", tools=[get_weather, food_security_analyst]
+    name="Test", instructions="Test agent", tools=[food_security_analyst]
 )
 
 
@@ -30,7 +25,6 @@ async def test_memory_absent():
     result = await Runner.run(agent, input=messages)
     assert result.final_output == "hello"
 
-
 @pytest.mark.asyncio
 async def test_memory_last_message_phrase():
     messages = [
@@ -41,21 +35,6 @@ async def test_memory_last_message_phrase():
     ]
     result = await Runner.run(agent, input=messages)
     assert result.final_output == "hello"
-
-
-@pytest.mark.asyncio
-async def test_weather_intent_parsing():
-    result = await Runner.run(agent, input="What's the weather in Paris?")
-    assert result.final_output == "The weather in Paris is sunny."
-
-
-@pytest.mark.asyncio
-async def test_weather_variations():
-    res1 = await Runner.run(agent, input="Bamako weather?")
-    assert res1.final_output == "The weather in Bamako is sunny."
-    res2 = await Runner.run(agent, input="What is the weather of Bamako")
-    assert res2.final_output == "The weather in Bamako is sunny."
-
 
 @pytest.mark.asyncio
 async def test_food_security_flow_start():

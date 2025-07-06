@@ -50,15 +50,15 @@ Use these tokens in the UI when logging in as a user or admin.
 
 ## Sample Bot Behavior
 
-The `my_bot.py` example defines a single `get_weather` tool. The runner only
-recognizes requests that begin with the tool name. For instance, sending:
+The `my_bot.py` example now exposes only the `food_security_analyst` tool. To
+start an analysis you can send a message such as:
 
 ```json
-{"message": "get_weather Paris"}
+{"message": "analyze maize"}
 ```
 
-returns the weather response. Any other phrasing will simply be echoed until the
-runner is extended with additional parsing logic.
+The agent will then walk through collecting price and availability details
+before providing a detailed market narrative.
 
 ## License
 

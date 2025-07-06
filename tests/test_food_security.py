@@ -21,5 +21,8 @@ def test_handler_collects_and_analyzes():
     step4 = handler.collect(price_two_months_ago=100)
     assert "availability" in step4.lower()
 
-    final = handler.collect(availability_level="high")
+    step5 = handler.collect(availability_level="high")
+    assert "country" in step5.lower()
+
+    final = handler.collect(country="Kenya")
     assert "analysis:" in final.lower()
