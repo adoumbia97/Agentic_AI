@@ -145,7 +145,8 @@
     const chatDiv    = document.getElementById('chat');
     const adminBody  = document.getElementById('admin-body');
 
-    let ws, history = [];
+      const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
+      let ws, history = [];
 
     function showAlert(msg, type='danger') {
       alertArea.innerHTML = `
@@ -200,7 +201,7 @@
           });
 
         // open WebSocket
-        ws = new WebSocket(`ws://${location.host}/ws/chat?access_token=${localStorage.app_token}`);
+          ws = new WebSocket(`${wsScheme}://${location.host}/ws/chat?access_token=${localStorage.app_token}`);
         ws.onmessage = e => {
           const {reply} = JSON.parse(e.data);
           const ts = Date.now();
