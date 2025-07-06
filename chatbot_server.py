@@ -71,7 +71,8 @@ async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit
 
 
 async def init_db():
-    await engine.run_sync(SQLModel.metadata.create_all)
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
 
 # ─── AGENT SETUP ───────────────────────────────────────────────
 @function_tool
