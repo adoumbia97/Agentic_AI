@@ -320,11 +320,19 @@
 
     // new conversation
     newConv.onclick = () => {
-      history = [];
-      chatDiv.innerHTML = '';
-      if (ws) ws.close();
-      // reconnect to start fresh
-      setLoggedIn('user', localStorage.app_username);
+      const token = localStorage.app_token;
+      // attempt to clear server-side history first
+      fetch(`/chat?access_token=${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'clear history' })
+      }).finally(() => {
+        history = [];
+        chatDiv.innerHTML = '';
+        if (ws) ws.close();
+        // reconnect to start fresh
+        setLoggedIn('user', localStorage.app_username);
+      });
     };
 
     // user usage alert

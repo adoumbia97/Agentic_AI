@@ -69,11 +69,17 @@ class Runner:
             if weather_tool:
                 match = re.search(
                     r"(?:weather|forecast|temperature|umbrella|rain)"
-                    r".*(?:in|for) ([A-Za-z ]+)",
+                    r".*(?:in|for|of) ([A-Za-z ]+)",
                     lowered,
                 )
+                if not match:
+                    match = re.search(
+                        r"([A-Za-z ]+)\s+(?:weather|forecast)",
+                        lowered,
+                    )
                 if match:
-                    city = match.group(1).strip().title()
+                    grp = match.lastindex or 1
+                    city = match.group(grp).strip().title()
                     try:
                         return str(weather_tool(city))
                     except Exception as exc:
