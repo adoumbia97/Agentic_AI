@@ -139,6 +139,22 @@ class Runner:
             if "what" in lowered and "goal" in lowered:
                 return agent.state.get("goal", "No specific goal has been set.")
 
+            info_match = re.search(
+                r"(?:info(?:rmation)?(?: about)?|tell me about)\s+(\w+)", lowered
+            )
+            if info_match:
+                from info_tools import get_information
+
+                topic = info_match.group(1)
+                agent.state["goal"] = f"Get information about {topic}"
+                if "analy" in lowered:
+                    info = get_information(topic, "kb")
+                    return (
+                        info
+                        + f"\nNow let's analyze {topic}. What was the price last month?"
+                    )
+                return get_information(topic, "kb")
+
             for tool in agent.tools:
                 if lowered.startswith(tool.__name__.lower()):
                     remainder = msg[len(tool.__name__) :].strip()

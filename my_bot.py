@@ -2,18 +2,16 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from food_security import food_security_analyst
+from info_tools import get_information
 from simple_agents import Agent, Runner
 
 agent = Agent(
     name="Hello world",
     instructions=(
-        "You are an intelligent AI assistant capable of collecting information, "
-        "using tools, and providing expert-level food security analysis. "
-        "When a user requests an analysis, ask follow-up questions to gather "
-        "recent prices, availability, and the country before calling the "
-        "`food_security_analyst` function."
+        "You are an agentic assistant. You are able to reason, plan, gather information, "
+        "and analyze food security conditions using available tools. Think before you act."
     ),
-    tools=[food_security_analyst],
+    tools=[get_information, food_security_analyst],
 )
 
 app = FastAPI()

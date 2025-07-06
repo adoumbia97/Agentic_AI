@@ -18,14 +18,13 @@ from fastapi.security.api_key import APIKeyHeader, APIKeyQuery
 from pydantic import BaseModel
 
 from food_security import food_security_analyst
+from info_tools import get_information
 from simple_agents import Agent, Runner
 
 SYSTEM_PROMPT = (
-    "You are an intelligent AI assistant capable of multi-step reasoning and "
-    "expert food security analysis. Collect the commodity name, recent price "
-    "history, availability level, and target country before invoking the "
-    "`food_security_analyst` tool. Maintain context and clearly confirm any "
-    "assumptions or missing data before you act."
+    "You are an agentic assistant. You are able to reason, plan, gather "
+    "information, and analyze food security conditions using available tools. "
+    "Think before you act."
 )
 
 # ─── CONFIG ───────────────────────────────────────────────────
@@ -94,7 +93,7 @@ def ensure_history(user: str) -> None:
 agent = Agent(
     name="Utility Bot",
     instructions=SYSTEM_PROMPT,
-    tools=[food_security_analyst],
+    tools=[get_information, food_security_analyst],
 )
 
 app = FastAPI()
