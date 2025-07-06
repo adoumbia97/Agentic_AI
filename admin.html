@@ -62,13 +62,13 @@
         return;
       }
       try {
-        const resp = await fetch(`/admin/usage?access_token=${token}`);
+        const resp = await fetch(`/admin/users?access_token=${token}`);
         if (!resp.ok) {
           throw new Error('Unauthorized');
         }
         const data = await resp.json();
         tbody.innerHTML = '';
-        Object.entries(data).forEach(([user, stats]) => {
+        Object.entries(data.users).forEach(([user, stats]) => {
           const row = document.createElement('tr');
           row.innerHTML = `
             <td>${user}</td>
