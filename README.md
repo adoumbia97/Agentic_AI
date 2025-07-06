@@ -16,7 +16,7 @@ This repository contains a lightweight AI-powered chatbot application built with
 ├── chatbot_server.py   # FastAPI application
 ├── index.html          # Web UI for chat and admin dashboard
 ├── my_bot.py           # Minimal example agent
-├── description.txt     # Full project overview
+├── PROJECT_OVERVIEW.md     # Full project overview
 └── README.md           # This file
 ```
 
