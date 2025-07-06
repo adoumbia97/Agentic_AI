@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>My Agent Chatbot</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      margin: 0; padding: 0;
+      display: flex; flex-direction: column; height: 100vh;
+    }
+    header {
+      background: #4a76a8; color: white;
+      padding: 1rem; display: flex; align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { margin: 0; font-size: 1.25rem; }
+
+    /* controls */
+    #controls {
+      flex: 0 0 auto; display: flex; align-items: center;
+      padding: 0.5rem; background: white; border-top: 1px solid #ddd;
+    }
+    #input {
+      flex: 1 1 auto; padding: 0.75rem; font-size: 1rem;
+      border: 1px solid #ccc; border-radius: 4px; margin-right: 0.5rem;
+    }
+    button {
+      padding: 0.75rem 1rem; font-size: 1rem;
+      border: none; border-radius: 4px; cursor: pointer;
+    }
+    #send        { background: #4a76a8; color: white; }
+    #send:disabled { background: #a0b0c0; cursor: default; }
+    #new-conv    { background: #6c757d; color: white; margin-right: 1rem; }
+    #login-btn, #usage-btn { background: #28a745; color: white; margin-left: .5rem; }
+
+    /* chat window */
+    #chat {
+      flex: 1 1 auto; padding: 1rem; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .chat-message {
+      max-width: 75%; display: flex; flex-direction: column;
+    }
+    .chat-message.user { align-self: flex-end; text-align: right; }
+    .chat-message.bot  { align-self: flex-start; text-align: left; }
+
+    .bubble {
+      padding: 0.75rem; border-radius: 12px; line-height: 1.4;
+    }
+    .user .bubble { background: #dcf8c6; border-bottom-right-radius: 0; }
+    .bot  .bubble { background: white; border: 1px solid #eee; border-bottom-left-radius: 0; }
+
+    .timestamp {
+      font-size: 0.75rem; color: #888; margin-top: 0.25rem;
+    }
+    #usage-info {
+      white-space: pre-wrap; font-family: monospace; margin-left: 1rem;
+      color: #333; background: #fff; padding: .5rem; border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🤖 My Agent Chatbot</h1>
+    <div>
+      <button id="new-conv">🆕 New Conversation</button>
+      <input  id="token-input" type="password" placeholder="API Key" />
+      <button id="login-btn">🔐 Login</button>
+      <button id="usage-btn">📊 Usage</button>
+    </div>
+  </header>
+
+  <div id="chat"></div>
+
+  <div id="controls">
+    <input  id="input" type="text" placeholder="Type a message…" autocomplete="off" />
+    <button id="send" disabled>Send</button>
+    <div id="usage-info"></div>
+  </div>
+
+  <script>
+    const chatEl      = document.getElementById('chat');
+    const inputEl     = document.getElementById('input');
+    const sendBtn     = document.getElementById('send');
+    const newConvBtn  = document.getElementById('new-conv');
+    const loginBtn    = document.getElementById('login-btn');
+    const usageBtn    = document.getElementById('usage-btn');
+    const tokenInput  = document.getElementById('token-input');
+    const usageInfoEl = document.getElementById('usage-info');
+
+    const TOKEN_KEY   = 'chat_token';
+    let ws, chatHistory = [];
+
+    // ─── UTILITIES ────────────────────────────────────────────
+    function saveHistory() {
+      localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+    }
+    function loadHistory() {
+      chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+      chatEl.innerHTML = '';
+      for (const {who, text, ts} of chatHistory) {
+        appendMessage(who, text, false, ts);
+      }
+      scrollToBottom();
+    }
+    function appendMessage(who, text, store=true, ts=Date.now()) {
+      const m = document.createElement('div');
+      m.classList.add('chat-message', who);
+      m.innerHTML = `
+        <div class="bubble">${text}</div>
+        <div class="timestamp">${new Date(ts).toLocaleTimeString()}</div>
+      `;
+      chatEl.appendChild(m);
+      if (store) {
+        chatHistory.push({who, text, ts});
+        saveHistory();
+      }
+      scrollToBottom();
+    }
+    function scrollToBottom() {
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    // ─── WS CONNECTION ────────────────────────────────────────
+    function connectWS() {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        alert('Please login first');
+        return;
+      }
+      if (ws) ws.close();
+      ws = new WebSocket(`ws://${location.host}/ws/chat?access_token=${token}`);
+      ws.onopen = ()    => console.log('WS opened');
+      ws.onmessage = e  => {
+        const {reply} = JSON.parse(e.data);
+        appendMessage('bot', reply);
+      };
+      ws.onclose = ()   => console.log('WS closed');
+    }
+
+    // ─── EVENT HANDLERS ──────────────────────────────────────
+    inputEl.addEventListener('input', () => {
+      sendBtn.disabled = inputEl.value.trim() === '';
+    });
+    sendBtn.addEventListener('click', () => {
+      const msg = inputEl.value.trim();
+      if (!msg) return;
+      appendMessage('user', msg);
+      ws.send(JSON.stringify({message: msg}));
+      inputEl.value = '';
+      sendBtn.disabled = true;
+    });
+
+    newConvBtn.addEventListener('click', () => {
+      chatHistory = [];
+      saveHistory();
+      chatEl.innerHTML = '';
+      connectWS();    // new WS = new convo on server
+    });
+
+    loginBtn.addEventListener('click', () => {
+      const t = tokenInput.value.trim();
+      if (!t) return alert('Enter your API Key');
+      localStorage.setItem(TOKEN_KEY, t);
+      tokenInput.value = '';
+      connectWS();
+      loadHistory();
+    });
+
+    usageBtn.addEventListener('click', async () => {
+      const t = localStorage.getItem(TOKEN_KEY);
+      if (!t) return alert('Login first');
+      const resp = await fetch(`/usage?access_token=${t}`);
+      if (!resp.ok) return alert('Failed to fetch usage');
+      const data = await resp.json();
+      usageInfoEl.textContent = 
+        `Conversations: ${data.conversations}\nMessages:      ${data.messages}`;
+    });
+
+    // ─── ON LOAD ──────────────────────────────────────────────
+    window.addEventListener('load', () => {
+      loadHistory();
+      if (localStorage.getItem(TOKEN_KEY)) {
+        connectWS();
+      }
+    });
+  </script>
+</body>
+</html>
