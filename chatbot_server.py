@@ -3,7 +3,8 @@ from pathlib import Path
 
 from typing import Optional
 
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlmodel import Field, SQLModel, select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from fastapi import (
     FastAPI, WebSocket, WebSocketDisconnect,
     Depends, HTTPException, status
@@ -65,11 +66,12 @@ class Usage(SQLModel, table=True):
 
 
 
-engine = create_engine("sqlite:///chat.db")
+engine = create_async_engine("sqlite+aiosqlite:///chat.db")
+async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-def init_db():
-    SQLModel.metadata.create_all(engine)
+async def init_db():
+    await engine.run_sync(SQLModel.metadata.create_all)
 
 # ─── AGENT SETUP ───────────────────────────────────────────────
 @function_tool
@@ -88,7 +90,7 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    await init_db()
     yield
 
 
@@ -104,10 +106,11 @@ async def serve_index():
 @app.get("/history")
 async def get_history(user: str = Depends(get_user)):
     """Return chat history for the user."""
-    with Session(engine) as session:
-        msgs = session.exec(
+    async with async_session() as session:
+        result = await session.exec(
             select(Message).where(Message.username == user).order_by(Message.timestamp)
-        ).all()
+        )
+        msgs = result.all()
         mapped = [
             {
                 "who": m.role == "assistant" and "bot" or "user",
@@ -121,13 +124,13 @@ async def get_history(user: str = Depends(get_user)):
 @app.get("/usage")
 async def user_usage(user: str = Depends(get_user)):
     """Return usage metrics for the user."""
-    with Session(engine) as session:
-        u = session.get(Usage, user)
+    async with async_session() as session:
+        u = await session.get(Usage, user)
         if not u:
             u = Usage(username=user)
             session.add(u)
-            session.commit()
-            session.refresh(u)
+            await session.commit()
+            await session.refresh(u)
         return {
             "username": user,
             "conversations": u.conversations,
@@ -144,15 +147,15 @@ async def admin_list_users(admin: str = Depends(get_admin)):
     """
     Return all users with usage + activation status.
     """
-    with Session(engine) as session:
+    async with async_session() as session:
         users_data = {}
         for u in USER_API_KEYS.values():
-            record = session.get(Usage, u)
+            record = await session.get(Usage, u)
             if not record:
                 record = Usage(username=u)
                 session.add(record)
-                session.commit()
-                session.refresh(record)
+                await session.commit()
+                await session.refresh(record)
             users_data[u] = {
                 "conversations": record.conversations,
                 "messages": record.messages,
@@ -191,16 +194,16 @@ async def websocket_chat(ws: WebSocket):
         await ws.close(code=1008)
         return
 
-    with Session(engine) as session:
-        record = session.get(Usage, user)
+    async with async_session() as session:
+        record = await session.get(Usage, user)
         if not record:
             record = Usage(username=user)
             session.add(record)
-            session.commit()
-            session.refresh(record)
+            await session.commit()
+            await session.refresh(record)
         record.conversations += 1
         session.add(record)
-        session.commit()
+        await session.commit()
     await ws.accept()
 
     while True:
@@ -214,8 +217,8 @@ async def websocket_chat(ws: WebSocket):
             continue
 
         ts = int(time.time() * 1000)
-        with Session(engine) as session:
-            rec = session.get(Usage, user)
+        async with async_session() as session:
+            rec = await session.get(Usage, user)
             if rec.first_request is None:
                 rec.first_request = ts
             rec.messages += 1
@@ -230,12 +233,13 @@ async def websocket_chat(ws: WebSocket):
                     timestamp=ts,
                 )
             )
-            session.commit()
-            chat_msgs = session.exec(
+            await session.commit()
+            result = await session.exec(
                 select(Message)
                 .where(Message.username == user)
                 .order_by(Message.timestamp)
-            ).all()
+            )
+            chat_msgs = result.all()
             chat_hist = [
                 {"role": "system", "content": agent.instructions}
             ] + [
@@ -245,8 +249,8 @@ async def websocket_chat(ws: WebSocket):
         result = await Runner.run(agent, input=chat_hist)
         reply = result.final_output
         reply_ts = int(time.time() * 1000)
-        with Session(engine) as session:
-            rec = session.get(Usage, user)
+        async with async_session() as session:
+            rec = await session.get(Usage, user)
             rec.total_bot_words += len(reply.split())
             session.add(rec)
             session.add(
@@ -257,7 +261,7 @@ async def websocket_chat(ws: WebSocket):
                     timestamp=reply_ts,
                 )
             )
-            session.commit()
+            await session.commit()
 
         await ws.send_json({"reply": reply})
 
@@ -274,13 +278,13 @@ async def chat_http(
     user: str = Depends(get_user),
 ):
     ts = int(time.time() * 1000)
-    with Session(engine) as session:
-        rec = session.get(Usage, user)
+    async with async_session() as session:
+        rec = await session.get(Usage, user)
         if not rec:
             rec = Usage(username=user)
             session.add(rec)
-            session.commit()
-            session.refresh(rec)
+            await session.commit()
+            await session.refresh(rec)
         if rec.first_request is None:
             rec.first_request = ts
         rec.messages += 1
@@ -295,12 +299,13 @@ async def chat_http(
                 timestamp=ts,
             )
         )
-        session.commit()
-        chat_msgs = session.exec(
+        await session.commit()
+        result = await session.exec(
             select(Message)
             .where(Message.username == user)
             .order_by(Message.timestamp)
-        ).all()
+        )
+        chat_msgs = result.all()
         chat_hist = [
             {"role": "system", "content": agent.instructions}
         ] + [
@@ -310,8 +315,8 @@ async def chat_http(
     result = await Runner.run(agent, input=chat_hist)
     reply = result.final_output
     reply_ts = int(time.time() * 1000)
-    with Session(engine) as session:
-        rec = session.get(Usage, user)
+    async with async_session() as session:
+        rec = await session.get(Usage, user)
         rec.total_bot_words += len(reply.split())
         session.add(rec)
         session.add(
@@ -322,7 +327,7 @@ async def chat_http(
                 timestamp=reply_ts,
             )
         )
-        session.commit()
+        await session.commit()
 
     return ChatResponse(reply=reply)
 
