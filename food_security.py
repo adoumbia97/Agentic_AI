@@ -92,11 +92,13 @@ class FoodSecurityHandler:
         prev = float(self.data["price_two_months_ago"])
         avail = self.data["availability_level"].lower()
 
-        prompt = (
-            "Act as a food security analyst. "
-            "Given the following details, provide a deep and realistic market analysis. "
-            "Use at least 8 sentences and consider potential shocks such as conflict, "
-            "climate events, or policy changes. Start your reply with 'Analysis:'"
+        system_prompt = (
+            "You are a professional food security analyst. "
+            "Use the provided figures to generate a comprehensive market assessment. "
+            "Discuss price trends in percent and volatility, the impact of current "
+            "availability, any relevant country context such as policy, climate or "
+            "conflict, and close with possible recommendations. Your reply must "
+            "contain at least eight sentences and begin with 'Analysis:'"
         )
 
         user_content = (
@@ -109,26 +111,27 @@ class FoodSecurityHandler:
 
         if openai and getattr(openai, "api_key", None):
             try:
-                resp = openai.ChatCompletion.create(
+                response = openai.ChatCompletion.create(
                     model="gpt-3.5-turbo-0613",
                     messages=[
-                        {"role": "system", "content": prompt},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_content},
                     ],
                 )
-                text = resp.choices[0].message.content.strip()
+                text = response.choices[0].message.content.strip()
                 if not text.lower().startswith("analysis"):
                     text = f"Analysis: {text}"
                 return text
-            except Exception:
-                pass
+            except Exception as exc:  # pragma: no cover - network call
+                return (
+                    "Analysis: An error occurred while contacting the analysis "
+                    f"service: {exc}"
+                )
 
         change = last - prev
         pct = (change / prev) * 100 if prev else 0
         trend = (
-            "increased"
-            if change > 0
-            else "decreased" if change < 0 else "remained stable"
+            "increased" if change > 0 else "decreased" if change < 0 else "remained stable"
         )
         availability_text = {
             "high": "supplies are plentiful",
@@ -136,15 +139,12 @@ class FoodSecurityHandler:
             "low": "there are significant shortages",
         }.get(avail, "availability information is unclear")
         return (
-            f"Commodity: {name}\n"
-            f"Country: {country}\n"
-            f"Price last month: {last}\n"
-            f"Price two months ago: {prev}\n"
-            f"Availability: {avail}\n\n"
-            f"Analysis: The price has {trend} by {pct:.1f}% compared with two months ago "
-            f"and {availability_text}. This change could affect household purchasing "
-            f"power and market stability. Ongoing monitoring and potential mitigation "
-            f"measures may be required if the trend persists."
+            "Analysis: "
+            f"The price of {name} in {country} has {trend} by {pct:.1f}% over the last "
+            f"two months, moving from {prev} to {last}. Current availability is {avail}, "
+            f"meaning {availability_text}. These market conditions may affect household "
+            f"purchasing power and broader food security. Continued monitoring and risk "
+            "mitigation efforts are advised."
         )
 
 

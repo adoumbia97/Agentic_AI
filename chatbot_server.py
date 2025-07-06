@@ -18,7 +18,7 @@ from fastapi.security.api_key import APIKeyHeader, APIKeyQuery
 from pydantic import BaseModel
 
 from food_security import food_security_analyst
-from simple_agents import Agent, Runner, function_tool
+from simple_agents import Agent, Runner
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant with expertise in food security, "
