@@ -6,7 +6,7 @@ try:
 except Exception:  # pragma: no cover - openai optional for tests
     openai = None
 
-from openai_config import load_api_key
+from openai_config import load_api_key, get_client
 
 from simple_agents import function_tool
 
@@ -116,13 +116,17 @@ class FoodSecurityHandler:
         )
 
         try:
-            response = openai.ChatCompletion.create(
+            client = get_client()
+            if not client:
+                raise RuntimeError("OpenAI client not configured")
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo-0613",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content},
                 ],
             )
+            client.close()
             text = response.choices[0].message.content.strip()
             if not text.lower().startswith("analysis"):
                 text = f"Analysis: {text}"
