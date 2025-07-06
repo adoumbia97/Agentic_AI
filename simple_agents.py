@@ -15,7 +15,23 @@ try:
 except Exception:  # pragma: no cover - openai optional for tests
     openai = None
 
-from openai_config import load_api_key, get_async_client
+from openai_config import get_async_client, load_api_key
+
+
+def _msg_attr(obj: Any, attr: str, default: Any | None = None) -> Any:
+    """Return attribute from OpenAI objects or dicts safely."""
+    if isinstance(obj, dict):
+        return obj.get(attr, default)
+    return getattr(obj, attr, default)
+
+
+def _msg_to_dict(obj: Any) -> Dict[str, Any]:
+    """Convert OpenAI response objects to dictionaries if possible."""
+    if isinstance(obj, dict):
+        return obj
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    return {}
 
 
 def function_tool(func: Callable) -> Callable:
@@ -229,9 +245,10 @@ class Runner:
             await client.close()
             print("OpenAI response:", response)
             msg = response.choices[0].message
-            if msg.get("function_call"):
-                name = msg["function_call"]["name"]
-                args = json.loads(msg["function_call"].get("arguments", "{}"))
+            func_call = _msg_attr(msg, "function_call")
+            if func_call is not None:
+                name = _msg_attr(func_call, "name")
+                args = json.loads(_msg_attr(func_call, "arguments", "{}"))
                 tool = next(
                     (t for t in agent.tools if t.__name__ == name),
                     None,
@@ -246,7 +263,7 @@ class Runner:
                     {
                         "role": "assistant",
                         "content": "",
-                        "function_call": msg["function_call"],
+                        "function_call": _msg_to_dict(func_call),
                     }
                 )
                 agent.history.append(
@@ -261,12 +278,13 @@ class Runner:
                     raise RuntimeError("OpenAI client not configured")
                 follow = await client.chat.completions.create(
                     model="gpt-3.5-turbo",
-                    messages=[{"role": "system", "content": agent.instructions}] + agent.history,
+                    messages=[{"role": "system", "content": agent.instructions}]
+                    + agent.history,
                 )
                 await client.close()
                 final = follow.choices[0].message.content
             else:
-                final = msg.get("content", "")
+                final = _msg_attr(msg, "content", "")
             if not final.strip():
                 final = "Hmm, something went wrong. Can you try again?"
             agent.history.append({"role": "assistant", "content": final})
