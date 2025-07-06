@@ -15,7 +15,7 @@ try:
 except Exception:  # pragma: no cover - openai optional for tests
     openai = None
 
-from openai_config import load_api_key
+from openai_config import load_api_key, get_async_client
 
 
 def function_tool(func: Callable) -> Callable:
@@ -196,26 +196,35 @@ class Runner:
             sig = inspect.signature(func)
             params = {name: {"type": "string"} for name in sig.parameters}
             return {
-                "name": func.__name__,
-                "description": func.__doc__ or "",
-                "parameters": {
-                    "type": "object",
-                    "properties": params,
-                    "required": list(params.keys()),
+                "type": "function",
+                "function": {
+                    "name": func.__name__,
+                    "description": func.__doc__ or "",
+                    "parameters": {
+                        "type": "object",
+                        "properties": params,
+                        "required": list(params.keys()),
+                    },
                 },
             }
 
         try:
-            response = await openai.ChatCompletion.acreate(
+            client = get_async_client()
+            if not client:
+                raise RuntimeError("OpenAI client not configured")
+            response = await client.chat.completions.create(
                 model="gpt-3.5-turbo-0613",
                 messages=messages,
-                functions=(
+                tools=(
                     [_tool_spec(t) for t in agent.tools] if requested_tool else None
                 ),
-                function_call=(
-                    {"name": requested_tool.__name__} if requested_tool else "none"
+                tool_choice=(
+                    {"type": "function", "function": {"name": requested_tool.__name__}}
+                    if requested_tool
+                    else "none"
                 ),
             )
+            await client.aclose()
             print("OpenAI response:", response)
             msg = response.choices[0].message
             if msg.get("function_call"):
@@ -245,11 +254,14 @@ class Runner:
                         "content": str(result),
                     }
                 )
-                follow = await openai.ChatCompletion.acreate(
+                client = get_async_client()
+                if not client:
+                    raise RuntimeError("OpenAI client not configured")
+                follow = await client.chat.completions.create(
                     model="gpt-3.5-turbo-0613",
-                    messages=[{"role": "system", "content": agent.instructions}]
-                    + agent.history,
+                    messages=[{"role": "system", "content": agent.instructions}] + agent.history,
                 )
+                await client.aclose()
                 final = follow.choices[0].message.content
             else:
                 final = msg.get("content", "")
