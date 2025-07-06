@@ -30,10 +30,16 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-2. Start the development server:
+2. Start the server:
 
 ```bash
-uvicorn chatbot_server:app --reload --host 0.0.0.0 --port 8000
+python chatbot_server.py
+```
+
+For automatic reloads during development, run:
+
+```bash
+uvicorn chatbot_server:app --reload
 ```
 
 3. Open `index.html` in your browser or navigate to `http://localhost:8000` if served by FastAPI.
