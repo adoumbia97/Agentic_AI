@@ -45,3 +45,11 @@ async def test_memory_last_message_phrase():
 async def test_food_security_flow_start():
     result = await Runner.run(agent, input="I want to analyze rice")
     assert "price of rice last month" in result.final_output.lower()
+
+
+@pytest.mark.asyncio
+async def test_food_security_progress_summary():
+    local_agent = Agent(name="T", instructions="Test agent", tools=[food_security_analyst])
+    await Runner.run(local_agent, input="analyze wheat")
+    summary = await Runner.run(local_agent, input="summary")
+    assert "commodity name: wheat" in summary.final_output.lower()
