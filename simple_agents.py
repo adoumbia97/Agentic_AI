@@ -120,6 +120,8 @@ class Runner:
             {"role": "system", "content": agent.instructions}
         ] + agent.history
 
+        print("Sending messages to OpenAI:", messages)
+
         requested_tool = None
         for tool in agent.tools:
             if re.search(rf"\b{tool.__name__}\b", message, re.IGNORECASE):
@@ -150,6 +152,7 @@ class Runner:
                 if requested_tool
                 else "none",
             )
+            print("OpenAI response:", response)
             msg = response.choices[0].message
             if msg.get("function_call"):
                 name = msg["function_call"]["name"]
@@ -186,12 +189,14 @@ class Runner:
                 final = follow.choices[0].message.content
             else:
                 final = msg.get("content", "")
+            if not final.strip():
+                final = "..."
             agent.history.append({"role": "assistant", "content": final})
             agent.history = agent.history[-history_size:]
             agent.logger.debug("[openai] user=%s reply=%s", message, final)
             return Result(final)
         except Exception as exc:
-            agent.logger.error("OpenAI request failed: %s", exc)
+            agent.logger.exception("OpenAI request failed: %s", exc)
             reply = _simple_reply(message, agent.history)
             agent.history.append({"role": "assistant", "content": reply})
             agent.history = agent.history[-history_size:]
