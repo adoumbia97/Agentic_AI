@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.security.api_key import APIKeyQuery, APIKeyHeader
 from pydantic import BaseModel
 from simple_agents import Agent, Runner, function_tool
+from food_security import food_security_analyst
 
 # ─── CONFIG ───────────────────────────────────────────────────
 USER_API_KEYS  = {"user1-token": "user1", "user2-token": "user2"}
@@ -85,7 +86,7 @@ agent = Agent(
         "data science, and humanitarian response. Provide thoughtful "
         "analysis, answer questions, and leverage your tools when helpful."
     ),
-    tools=[get_weather, show_time, fetch_doc],
+    tools=[get_weather, show_time, fetch_doc, food_security_analyst],
 )
 
 app = FastAPI()
