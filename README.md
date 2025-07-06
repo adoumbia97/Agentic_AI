@@ -48,6 +48,18 @@ The server uses simple in-memory API keys for demonstration:
 
 Use these tokens in the UI when logging in as a user or admin.
 
+## Sample Bot Behavior
+
+The `my_bot.py` example defines a single `get_weather` tool. The runner only
+recognizes requests that begin with the tool name. For instance, sending:
+
+```json
+{"message": "get_weather Paris"}
+```
+
+returns the weather response. Any other phrasing will simply be echoed until the
+runner is extended with additional parsing logic.
+
 ## License
 
 This project is provided as-is for demonstration purposes.
