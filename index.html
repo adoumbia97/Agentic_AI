@@ -103,7 +103,11 @@
         <div class="card-header bg-light">
           <h5 class="mb-0">🔒 Admin Dashboard</h5>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body p-3">
+          <form id="upload-form" class="mb-3 d-flex gap-2" enctype="multipart/form-data">
+            <input type="file" id="doc-file" class="form-control form-control-sm" required>
+            <button class="btn btn-sm btn-primary" type="submit">Upload Doc</button>
+          </form>
           <table class="table table-sm table-hover mb-0">
             <thead class="table-light">
               <tr>
@@ -126,6 +130,21 @@
 
   </div>
 
+  <!-- history modal -->
+  <div class="modal fade" id="history-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">User History</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <pre id="history-body" class="mb-0"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Bootstrap JS bundle -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
@@ -144,9 +163,29 @@
     const sendBtn    = document.getElementById('send-btn');
     const chatDiv    = document.getElementById('chat');
     const adminBody  = document.getElementById('admin-body');
+    const uploadForm = document.getElementById('upload-form');
+    const docFile    = document.getElementById('doc-file');
+    const histModal  = new bootstrap.Modal(document.getElementById('history-modal'));
+    const histBody   = document.getElementById('history-body');
 
       const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
       let ws, history = [];
+
+      uploadForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const file = docFile.files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        fetch(`/admin/docs?access_token=${localStorage.app_token}`, {
+          method: 'POST',
+          body: fd
+        }).then(r => {
+          if (!r.ok) throw 0;
+          showAlert('Document uploaded', 'success');
+          docFile.value = '';
+        }).catch(() => showAlert('Upload failed', 'warning'));
+      });
 
     function showAlert(msg, type='danger') {
       alertArea.innerHTML = `
@@ -311,13 +350,27 @@
               <td>${last}</td>
               <td>${info.total_user_words}</td>
               <td>${info.total_bot_words}</td>
-              <td>
-                <button class="btn btn-sm btn-${info.active ? 'danger' : 'success'}">
+              <td class="d-flex gap-1">
+                <button class="btn btn-sm btn-info history-btn">History</button>
+                <button class="btn btn-sm btn-${info.active ? 'danger' : 'success'} toggle-btn">
                   ${info.active ? 'Deactivate' : 'Activate'}
                 </button>
               </td>`;
-            const btn = tr.querySelector('button');
-            btn.onclick = () => {
+
+            const histButton = tr.querySelector('.history-btn');
+            histButton.onclick = () => {
+              fetch(`/admin/history/${user}?access_token=${token}`)
+                .then(r => r.json())
+                .then(d => {
+                  histBody.textContent = d.history
+                    .map(m => `${new Date(m.ts).toLocaleString()} [${m.who}] ${m.text}`)
+                    .join('\n');
+                  histModal.show();
+                });
+            };
+
+            const toggleButton = tr.querySelector('.toggle-btn');
+            toggleButton.onclick = () => {
               fetch(
                 `/admin/users/${user}?access_token=${token}`,
                 {
