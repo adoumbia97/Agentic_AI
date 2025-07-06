@@ -200,12 +200,6 @@ class Runner:
 
         print("Sending messages to OpenAI:", messages)
 
-        requested_tool = None
-        for tool in agent.tools:
-            if re.search(rf"\b{tool.__name__}\b", message, re.IGNORECASE):
-                requested_tool = tool
-                break
-
         def _tool_spec(func: Callable) -> Dict[str, Any]:
             if hasattr(func, "openai_schema"):
                 return func.openai_schema  # type: ignore[return-value]
@@ -228,19 +222,17 @@ class Runner:
             client = get_async_client()
             if not client:
                 raise RuntimeError("OpenAI client not configured")
-            tools_param = (
-                [_tool_spec(t) for t in agent.tools] if requested_tool else None
-            )
+
+            tools_param = [_tool_spec(t) for t in agent.tools] if agent.tools else None
+
             payload = {
                 "model": "gpt-3.5-turbo",
                 "messages": messages,
             }
+
             if tools_param:
                 payload["tools"] = tools_param
-                payload["tool_choice"] = {
-                    "type": "function",
-                    "function": {"name": requested_tool.__name__},
-                }
+                payload["tool_choice"] = "auto"
             response = await client.chat.completions.create(**payload)
             await client.close()
             print("OpenAI response:", response)
