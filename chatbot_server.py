@@ -81,8 +81,8 @@ agent = Agent(
     name="Utility Bot",
     instructions=(
         "You are an expert assistant with deep knowledge of food security, "
-        "data science, and humanitarian response. You can also answer "
-        "general questions such as weather inquiries. Provide thoughtful "
+
+        "data science, and humanitarian response. Provide thoughtful "
         "analysis, answer questions, and leverage your tools when helpful."
     ),
     tools=[get_weather, show_time, fetch_doc],
