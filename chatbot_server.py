@@ -1,6 +1,7 @@
 import time
 from pathlib import Path
 from collections import defaultdict
+import os
 from fastapi import (
     FastAPI, WebSocket, WebSocketDisconnect,
     Depends, HTTPException, status, UploadFile, File
@@ -17,6 +18,9 @@ ADMIN_API_KEYS = {"admin-token": "admin"}
 API_KEY_NAME   = "access_token"
 api_key_query  = APIKeyQuery(name=API_KEY_NAME, auto_error=False)
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+# only keep the last N user/assistant exchanges when sending to the agent
+HISTORY_EXCHANGES = int(os.getenv("CHAT_HISTORY_LIMIT", "5"))
 
 # track activation state
 user_status = {username: True for username in USER_API_KEYS.values()}
@@ -219,11 +223,11 @@ async def websocket_chat(ws: WebSocket):
 
         # store and call
         conversations[user].append({"role": "user", "content": msg, "ts": ts})
-        # build OpenAI chat history
+        # build OpenAI chat history limited to last N exchanges
+        recent = conversations[user][-HISTORY_EXCHANGES * 2:]
         chat_hist = (
             [{"role": "system", "content": agent.instructions}]
-            + [{"role": m["role"], "content": m["content"]}
-               for m in conversations[user]]
+            + [{"role": m["role"], "content": m["content"]} for m in recent]
         )
         result = await Runner.run(agent, input=chat_hist)
         reply = result.final_output
@@ -257,11 +261,15 @@ async def chat_http(
     u["last_request"]   = ts
     u["total_user_words"] += len(req.message.split())
 
-    conversations[user].append({"role": "user", "content": req.message, "ts": ts})
+    conversations[user].append({
+        "role": "user",
+        "content": req.message,
+        "ts": ts,
+    })
+    recent = conversations[user][-HISTORY_EXCHANGES * 2:]
     chat_hist = (
         [{"role": "system", "content": agent.instructions}]
-        + [{"role": m["role"], "content": m["content"]}
-           for m in conversations[user]]
+        + [{"role": m["role"], "content": m["content"]} for m in recent]
     )
     result = await Runner.run(agent, input=chat_hist)
     reply = result.final_output
