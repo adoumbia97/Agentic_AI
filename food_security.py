@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Any, Dict
 
 from simple_agents import function_tool
 
@@ -15,20 +15,20 @@ FOOD_SECURITY_SCHEMA = {
         "properties": {
             "commodity_name": {
                 "type": "string",
-                "description": "Name of the commodity"
+                "description": "Name of the commodity",
             },
             "price_last_month": {
                 "type": "number",
-                "description": "Price of the commodity last month"
+                "description": "Price of the commodity last month",
             },
             "price_two_months_ago": {
                 "type": "number",
-                "description": "Price two months ago"
+                "description": "Price two months ago",
             },
             "availability_level": {
                 "type": "string",
                 "enum": ["high", "moderate", "low"],
-                "description": "Current availability level"
+                "description": "Current availability level",
             },
         },
         "required": [
@@ -78,7 +78,11 @@ class FoodSecurityHandler:
         avail = self.data["availability_level"].lower()
         change = last - prev
         pct = (change / prev) * 100 if prev else 0
-        trend = "increased" if change > 0 else "decreased" if change < 0 else "remained stable"
+        trend = (
+            "increased"
+            if change > 0
+            else "decreased" if change < 0 else "remained stable"
+        )
         availability_text = {
             "high": "supplies are plentiful",
             "moderate": "supplies are somewhat constrained",

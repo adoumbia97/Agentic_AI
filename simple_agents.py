@@ -7,7 +7,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Union
 
-
 try:
     import openai
 except Exception:  # pragma: no cover - openai optional for tests
@@ -37,7 +36,9 @@ class Result:
         self.final_output = final_output
 
 
-def _parse_food_security_reply(text: str, handler: FoodSecurityHandler) -> Dict[str, Any]:
+def _parse_food_security_reply(
+    text: str, handler: FoodSecurityHandler
+) -> Dict[str, Any]:
     """Extract the next required value from a user reply."""
     pending = next((k for k in handler.order if k not in handler.data), None)
     if not pending:
@@ -99,6 +100,17 @@ class Runner:
                     agent.state.pop(fs_key, None)
                 return prompt
 
+            match = re.search(r"(?:analy[sz]e|analysis(?: of)?)\s+(\w+)", lowered)
+            if match:
+                from food_security import FoodSecurityHandler
+
+                commodity = match.group(1)
+                agent.state[fs_key] = FoodSecurityHandler({"commodity_name": commodity})
+                return (
+                    f"Sure, I can help with a food security analysis. Let's start. "
+                    f"What was the price of {commodity} last month?"
+                )
+
             for tool in agent.tools:
                 if lowered.startswith(tool.__name__.lower()):
                     remainder = msg[len(tool.__name__) :].strip()
@@ -119,7 +131,11 @@ class Runner:
                         first_prompt = agent.state[fs_key].collect(
                             commodity_name=commodity or None
                         )
-                        return f"Sure, to analyze {commodity}, could you tell me the price last month?" if commodity else first_prompt
+                        return (
+                            f"Sure, to analyze {commodity}, could you tell me the price last month?"
+                            if commodity
+                            else first_prompt
+                        )
                     return f"Error running tool {tool.__name__}: incorrect arguments"
 
             weather_tool = next(
