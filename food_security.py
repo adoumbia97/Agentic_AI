@@ -10,45 +10,48 @@ from openai_config import load_api_key, get_client
 
 from simple_agents import function_tool
 
-# OpenAI-compatible function schema
+# OpenAI-compatible tool schema
 FOOD_SECURITY_SCHEMA = {
-    "name": "food_security_analyst",
-    "description": (
-        "Provide an expert level food security analysis using recent prices "
-        "and availability levels for a commodity."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "commodity_name": {
-                "type": "string",
-                "description": "Name of the commodity",
+    "type": "function",
+    "function": {
+        "name": "food_security_analyst",
+        "description": (
+            "Provide an expert level food security analysis using recent prices "
+            "and availability levels for a commodity."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "commodity_name": {
+                    "type": "string",
+                    "description": "Name of the commodity",
+                },
+                "price_last_month": {
+                    "type": "number",
+                    "description": "Price of the commodity last month",
+                },
+                "price_two_months_ago": {
+                    "type": "number",
+                    "description": "Price two months ago",
+                },
+                "availability_level": {
+                    "type": "string",
+                    "enum": ["high", "moderate", "low"],
+                    "description": "Current availability level",
+                },
+                "country": {
+                    "type": "string",
+                    "description": "Country of interest",
+                },
             },
-            "price_last_month": {
-                "type": "number",
-                "description": "Price of the commodity last month",
-            },
-            "price_two_months_ago": {
-                "type": "number",
-                "description": "Price two months ago",
-            },
-            "availability_level": {
-                "type": "string",
-                "enum": ["high", "moderate", "low"],
-                "description": "Current availability level",
-            },
-            "country": {
-                "type": "string",
-                "description": "Country of interest",
-            },
+            "required": [
+                "commodity_name",
+                "price_last_month",
+                "price_two_months_ago",
+                "availability_level",
+                "country",
+            ],
         },
-        "required": [
-            "commodity_name",
-            "price_last_month",
-            "price_two_months_ago",
-            "availability_level",
-            "country",
-        ],
     },
 }
 
