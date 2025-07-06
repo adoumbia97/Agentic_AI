@@ -130,6 +130,7 @@ class FoodSecurityHandler:
                     {"role": "user", "content": user_content},
                 ],
             )
+            logging.getLogger(__name__).debug("Food security response: %s", response)
             client.close()
             try:
                 choice = response.choices[0]
@@ -140,10 +141,14 @@ class FoodSecurityHandler:
                     "Invalid food security response structure: %s", response
                 )
                 text = ""
+
+            if not text or not text.strip():
+                return "Sorry, I was unable to generate the analysis. Please try again."
             if not text.lower().startswith("analysis"):
                 text = f"Analysis: {text}"
             return text
         except Exception as exc:  # pragma: no cover - network call
+            logging.getLogger(__name__).error("OpenAI API error: %s", exc)
             return (
                 "Analysis: An error occurred while contacting the analysis service: "
                 f"{exc}"
