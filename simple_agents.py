@@ -235,8 +235,13 @@ class Runner:
                 payload["tool_choice"] = "auto"
             response = await client.chat.completions.create(**payload)
             await client.close()
-            print("OpenAI response:", response)
-            msg = response.choices[0].message
+            agent.logger.debug("OpenAI response: %s", response)
+            try:
+                choice = response.choices[0]
+                msg = _msg_attr(choice, "message")
+            except Exception:
+                agent.logger.error("Invalid OpenAI response structure: %s", response)
+                msg = None
             func_call = _msg_attr(msg, "function_call")
             if func_call is not None:
                 name = _msg_attr(func_call, "name")
@@ -274,18 +279,26 @@ class Runner:
                     + agent.history,
                 )
                 await client.close()
-                final = follow.choices[0].message.content
+                try:
+                    follow_choice = follow.choices[0]
+                    follow_msg = _msg_attr(follow_choice, "message")
+                    final = _msg_attr(follow_msg, "content")
+                except Exception:
+                    agent.logger.error(
+                        "Invalid follow-up OpenAI response structure: %s", follow
+                    )
+                    final = None
             else:
                 final = _msg_attr(msg, "content", "")
-            if not final.strip():
-                final = "Hmm, something went wrong. Can you try again?"
+            if final is None or not str(final).strip():
+                final = "I wasn't able to generate a valid response."
             agent.history.append({"role": "assistant", "content": final})
             agent.history = agent.history[-history_size:]
             agent.logger.debug("[openai] user=%s reply=%s", message, final)
             return Result(final)
         except Exception as exc:
             agent.logger.exception("OpenAI request failed: %s", exc)
-            reply = "Hmm, something went wrong. Can you try again?"
+            reply = "Sorry, something went wrong while generating the analysis."
             agent.history.append({"role": "assistant", "content": reply})
             agent.history = agent.history[-history_size:]
             return Result(reply)
